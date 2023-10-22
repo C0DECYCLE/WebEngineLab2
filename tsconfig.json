@@ -21,8 +21,9 @@
         "checkJs": false,
         "target": "ES2022",
         "module": "ES2022",
-        "outDir": "./build",
-        "rootDirs": ["./src", "./types"],
+        "outDir": "build",
+        "rootDirs": ["src", "tests", "types"],
+        "typeRoots": ["node_modules/@webgpu/types", "node_modules/@types"],
         "forceConsistentCasingInFileNames": true,
         "pretty": true,
         "diagnostics": false,
@@ -32,5 +33,5 @@
         "strictFunctionTypes": true,
         "esModuleInterop": true
     },
-    "include": ["./src", "./types"]
+    "include": ["src", "tests", "types"]
 }

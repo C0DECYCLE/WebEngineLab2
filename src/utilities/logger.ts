@@ -3,7 +3,7 @@
  * Written by Noah Mattia Bussinger, October 2023
  */
 
-import { int } from "./../../types/utils.js";
+import { int } from "../../types/utilities/utils.type.js";
 
 const logger_maximum: int = 256;
 

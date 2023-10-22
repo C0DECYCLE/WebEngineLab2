@@ -3,7 +3,7 @@
  * Written by Noah Mattia Bussinger, October 2023
  */
 
-import { int, float, uuid } from "./../../types/utils.js";
+import { int, float, uuid } from "../../types/utilities/utils.type.js";
 
 export const PHI: float = (1.0 + 5.0 ** 0.5) / 2.0;
 
@@ -45,8 +45,8 @@ export function clamp(
     value: int | float,
     min: int | float,
     max: int | float,
-): int | float {
-    return Math.min(Math.max(value, min), max) as int | float;
+): float {
+    return Math.min(Math.max(value, min), max) as float;
 }
 
 export function firstLetterUppercase(value: string): string {
@@ -66,10 +66,11 @@ export function toHexadecimal(value: string): Number {
     return Number(`0x${value.split("#")[1]}`);
 }
 
-export function count<T>(value: Array<T>, target: T): int {
+export function count<T>(value: T[], target: T): int {
     return value.filter((x: T): boolean => x === target).length;
 }
 
-export function clear<T>(value: Array<T>): void {
+export function clear<T>(value: T[]): T[] {
     value.length = 0;
+    return value;
 }
