@@ -1,30 +1,44 @@
+/**
+ * Copyright (C) - All Rights Reserved
+ * Written by Noah Mattia Bussinger, October 2023
+ */
+
 struct Uniforms {
-    matrix: mat4x4f,
-    mode: u32, // 0: triangle, 1: cluster, 2: normal
+    viewProjection: mat4x4f,
+    mode: u32, // 0: triangle, 1: normal
 };
 
 struct Vertex {
     position: vec3f,
-    clusterId: u32,
+};
+
+struct Instance {
+    position: vec3f,
 };
 
 struct VertexShaderOut {
     @builtin(position) position: vec4f,
     @location(0) worldPosition: vec3f,
     @interpolate(flat) @location(1) flatWorldPosition: vec3f,
-    @interpolate(flat) @location(2) clusterId: u32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> vertecies: array<Vertex>;
+@group(0) @binding(2) var<storage, read> instances: array<Instance>;
 
-@vertex fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexShaderOut {
+@vertex fn vs(
+    @builtin(vertex_index) vertexIndex: u32,
+    @builtin(instance_index) instanceIndex: u32
+) -> VertexShaderOut {
     let vertex: Vertex = vertecies[vertexIndex];
+    let instance: Instance = instances[instanceIndex];
+    var position: vec3f = vertex.position;
+    //position.z += cos(position.y);
+    position += instance.position;
     var out: VertexShaderOut;
-    out.position = uniforms.matrix * vec4f(vertex.position, 1.0);
-    out.worldPosition = vertex.position;
-    out.flatWorldPosition = vertex.position;
-    out.clusterId = vertex.clusterId;
+    out.position = uniforms.viewProjection * vec4f(position, 1.0);
+    out.worldPosition = position;
+    out.flatWorldPosition = position;
     return out;
 }
 
@@ -33,9 +47,6 @@ struct VertexShaderOut {
         return triangleShade(in.flatWorldPosition);
     }
     if (uniforms.mode == 1) {
-        return clusterShade(in.clusterId);
-    }
-    if (uniforms.mode == 2) {
         return normalShade(in.worldPosition);
     }
     return vec4f(0.0, 0.0, 0.0, 1.0);
@@ -46,20 +57,6 @@ fn triangleShade(pos: vec3f) -> vec4f {
     let ox: f32 = pos.x * s;
     let oy: f32 = pos.y * s;
     let oz: f32 = pos.z * s;
-    let r: f32 = noise3(vec3f(oy, oz, ox));
-    let g: f32 = noise3(vec3f(oz, ox, oy));
-    let b: f32 = noise3(vec3f(ox, oy, oz));
-    return vec4f(r, g, b, 1.0);
-}
-
-fn clusterShade(id: u32) -> vec4f {
-    if (id == 0) {
-        return vec4f(1.0, 1.0, 1.0, 1.0);
-    }
-    let f: f32 = f32(id);
-    let ox: f32 = f * 1.0;
-    let oy: f32 = f * 2.0;
-    let oz: f32 = f * 3.0;
     let r: f32 = noise3(vec3f(oy, oz, ox));
     let g: f32 = noise3(vec3f(oz, ox, oy));
     let b: f32 = noise3(vec3f(ox, oy, oz));
