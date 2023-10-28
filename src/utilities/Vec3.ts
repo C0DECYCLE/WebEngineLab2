@@ -3,7 +3,7 @@
  * Written by Noah Mattia Bussinger, October 2023
  */
 
-import { int, float } from "../../types/utilities/utils.type.js";
+import { int, float, FloatArray } from "../../types/utilities/utils.type.js";
 import { Mat4 } from "./Mat4.js";
 
 export class Vec3 {
@@ -184,10 +184,7 @@ export class Vec3 {
         return this.set(v.x, v.y, v.z);
     }
 
-    public store(
-        target: float[] | Float32Array | Float64Array,
-        offset: int = 0,
-    ): Vec3 {
+    public store(target: FloatArray, offset: int = 0): Vec3 {
         target[offset + 0] = this.x;
         target[offset + 1] = this.y;
         target[offset + 2] = this.z;
