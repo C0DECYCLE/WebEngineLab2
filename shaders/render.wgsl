@@ -5,7 +5,8 @@
 
 struct Uniforms {
     viewProjection: mat4x4f,
-    mode: u32, // 0: triangle, 1: normal
+    mode: u32, // 0: triangle, 1: normal, 2: grass
+    time: f32
 };
 
 struct Vertex {
@@ -13,7 +14,7 @@ struct Vertex {
 };
 
 struct Instance {
-    position: vec3f,
+    matrix: mat4x4f,
 };
 
 struct VertexShaderOut {
@@ -33,8 +34,8 @@ struct VertexShaderOut {
     let vertex: Vertex = vertecies[vertexIndex];
     let instance: Instance = instances[instanceIndex];
     var position: vec3f = vertex.position;
-    //position.z += cos(position.y);
-    position += instance.position;
+    position.z += cos(position.y) - 1.0;
+    position = (vec4f(position, 1.0) * instance.matrix).xyz;
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1.0);
     out.worldPosition = position;
@@ -48,6 +49,9 @@ struct VertexShaderOut {
     }
     if (uniforms.mode == 1) {
         return normalShade(in.worldPosition);
+    }
+    if (uniforms.mode == 2) {
+        return grassShade(in.worldPosition);
     }
     return vec4f(0.0, 0.0, 0.0, 1.0);
 }
@@ -66,6 +70,26 @@ fn triangleShade(pos: vec3f) -> vec4f {
 fn normalShade(pos: vec3f) -> vec4f {
     let normal: vec3f = normalize(cross(dpdx(pos), dpdy(pos)));
     return vec4f(normal * 0.5 + 0.5, 1.0);
+}
+
+fn grassShade(pos: vec3f) -> vec4f {
+    let faceNormal: vec3f = normalize(cross(dpdx(pos), dpdy(pos)));
+    let lightDirection: vec3f = normalize(vec3f(-0.5, -1.0, -0.5));
+
+    let theta: f32 = dot(faceNormal, lightDirection);
+    let shade: f32 = max(0.0, theta * 0.5 + 0.5);
+
+    let finalColor: vec3f = vec3f(0.0, 0.9, 0.4) * shade;
+    return vec4f(finalColor, 1.0);
+}
+
+fn rand(n: f32) -> f32 {
+    return fract(sin(n) * 43758.5453123);
+}
+
+fn noise(p: f32) -> f32 {
+    let fl = floor(p);
+    return mix(rand(fl), rand(fl + 1.), fract(p));
 }
 
 fn mod289(x: vec4f) -> vec4f {

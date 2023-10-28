@@ -34,11 +34,7 @@ function createCanvas(): HTMLCanvasElement {
 
 const canvas: HTMLCanvasElement = createCanvas();
 const adapter: Nullable<GPUAdapter> = await navigator.gpu?.requestAdapter();
-const device: Undefinable<GPUDevice> = await adapter?.requestDevice({
-    requiredFeatures: [
-        /*"timestamp-query"*/
-    ],
-} as GPUDeviceDescriptor);
+const device: Undefinable<GPUDevice> = await adapter?.requestDevice();
 const context: Nullable<GPUCanvasContext> = canvas.getContext("webgpu");
 if (!device || !context) {
     throw new Error("SpaceEngine: Browser doesn't support WebGPU.");
@@ -132,7 +128,7 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
 //////////// UNIFORM ////////////
 
 const byteSize: int = 4;
-const uniformBufferSize: int = 16 * byteSize + 1 * byteSize;
+const uniformBufferSize: int = 16 * byteSize + 1 * byteSize + 1 * byteSize;
 
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
@@ -148,8 +144,9 @@ const intValues: Uint32Array = new Uint32Array(uniformArrayBuffer);
 
 const matrixOffset: int = 0;
 const modeOffset: int = 16;
+const timeOffset: int = 17;
 
-(window as any).setMode = (mode: 0 | 1) => {
+(window as any).setMode = (mode: 0 | 1 | 2) => {
     intValues[modeOffset] = mode;
     device?.queue.writeBuffer(
         uniformBuffer,
@@ -158,7 +155,7 @@ const modeOffset: int = 16;
         modeOffset * byteSize,
     );
 };
-(window as any).setMode(0);
+(window as any).setMode(2);
 
 //////////// VERTECIES ////////////
 
@@ -182,11 +179,11 @@ device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
 
 //////////// INSTANCES ////////////
 
-const instanceCount: int = 100;
+const instanceCount: int = 1_000;
 
 const instancesBuffer: GPUBuffer = device.createBuffer({
     label: "instances storage buffer",
-    size: instanceCount * 4 * 4,
+    size: instanceCount * 4 * 4 * byteSize,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
@@ -224,53 +221,11 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
     ],
 } as GPUBindGroupDescriptor);
 
-//////////// TIMING ////////////
-
-/*
-const capacity: int = 2;
-
-const querySet: GPUQuerySet = device.createQuerySet({
-    type: "timestamp",
-    count: capacity,
-} as GPUQuerySetDescriptor);
-
-const queryBuffer: GPUBuffer = device.createBuffer({
-    size: 8 * capacity,
-    usage:
-        GPUBufferUsage.QUERY_RESOLVE |
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-} as GPUBufferDescriptor);
-
-function readBuffer(
-    device: GPUDevice,
-    buffer: GPUBuffer,
-): Promise<ArrayBuffer> {
-    return new Promise<ArrayBuffer>((resolve) => {
-        const size = buffer.size;
-        const gpuReadBuffer = device.createBuffer({
-            size,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-        });
-        const copyEncoder = device.createCommandEncoder();
-        copyEncoder.copyBufferToBuffer(buffer, 0, gpuReadBuffer, 0, size);
-        const copyCommands = copyEncoder.finish();
-        device.queue.submit([copyCommands]);
-        gpuReadBuffer.mapAsync(GPUMapMode.READ).then(() => {
-            resolve(gpuReadBuffer.getMappedRange());
-        });
-    });
-}
-*/
-
 //////////// COMPUTE ////////////
 
 const computeEncoder: GPUCommandEncoder = device!.createCommandEncoder({
     label: "compute command encoder",
 } as GPUObjectDescriptorBase);
-
-//computeEncoder.writeTimestamp(querySet, 0);
 
 const computePass = computeEncoder.beginComputePass({
     label: "compute pass",
@@ -280,27 +235,11 @@ computePass.setBindGroup(0, computeBindGroup);
 computePass.dispatchWorkgroups(instanceCount, 1, 1);
 computePass.end();
 
-/*
-computeEncoder.writeTimestamp(querySet, 1);
-computeEncoder.resolveQuerySet(querySet, 0, capacity, queryBuffer, 0);
-*/
-
 const computeCommandBuffer: GPUCommandBuffer = computeEncoder.finish();
 device?.queue.submit([computeCommandBuffer]);
 
-/*
-readBuffer(device, queryBuffer).then((arrayBuffer) => {
-    const timingsNanoseconds = new BigInt64Array(arrayBuffer);
-    log(
-        Number(timingsNanoseconds[1] - timingsNanoseconds[0]) / 1_000_000,
-        "ms",
-    );
-});
-*/
-
 //////////// MATRIX ////////////
 
-//const world: Mat4 = new Mat4();
 const view: Mat4 = new Mat4();
 const projection: Mat4 = Mat4.Perspective(
     60 * toRadian,
@@ -329,7 +268,6 @@ canvas.addEventListener("click", () => {
 
 const stats: Stats = new Stats();
 stats.set("frame delta", 0);
-//stats.set("gpu delta", 0);
 stats.show();
 
 async function render(now: float): Promise<void> {
@@ -346,6 +284,13 @@ async function render(now: float): Promise<void> {
         uniformArrayBuffer,
         matrixOffset * byteSize,
     );
+    floatValues[timeOffset] = performance.now();
+    device?.queue.writeBuffer(
+        uniformBuffer,
+        timeOffset * byteSize,
+        uniformArrayBuffer,
+        timeOffset * byteSize,
+    );
 
     //////////// DRAW ////////////
 
@@ -356,8 +301,6 @@ async function render(now: float): Promise<void> {
         label: "render command encoder",
     } as GPUObjectDescriptorBase);
 
-    //renderEncoder.writeTimestamp(querySet, 0);
-
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
     renderPass.setPipeline(renderPipeline);
@@ -365,23 +308,8 @@ async function render(now: float): Promise<void> {
     renderPass.draw(vertexCount, instanceCount);
     renderPass.end();
 
-    /*
-    renderEncoder.writeTimestamp(querySet, 1);
-    renderEncoder.resolveQuerySet(querySet, 0, capacity, queryBuffer, 0);
-    */
-
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
     device?.queue.submit([renderCommandBuffer]);
-
-    /*
-    readBuffer(device!, queryBuffer).then((arrayBuffer) => {
-        const timingsNanoseconds = new BigInt64Array(arrayBuffer);
-        stats.set(
-            "gpu delta",
-            Number(timingsNanoseconds[1] - timingsNanoseconds[0]) / 1_000_000,
-        );
-    });
-    */
 
     //////////// FRAME ////////////
 
@@ -397,13 +325,8 @@ async function render(now: float): Promise<void> {
             <b>cpu rate: ${(1_000 / stats.get("cpu delta")!).toFixed(
                 1,
             )} fps</b><br>
-            cpu delta: ${stats.get("cpu delta")!.toFixed(2)} ms`/*<br>
-            <br>
-            <b>gpu rate: ${(1_000 / stats.get("gpu delta")!).toFixed(
-                1,
-            )} fps</b><br>
-            gpu delta: ${stats.get("gpu delta")!.toFixed(2)} ms`*/
-    );
+            cpu delta: ${stats.get("cpu delta")!.toFixed(2)} ms
+    `);
     stats.set("frame delta", now);
 
     requestAnimationFrame(render);

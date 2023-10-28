@@ -3,6 +3,7 @@
     "version": "0.1.0",
     "type": "module",
     "scripts": {
+        "install": "npm install",
         "build": "clear && npx tsc",
         "test": "clear && node --experimental-vm-modules node_modules/.bin/jest"
     },

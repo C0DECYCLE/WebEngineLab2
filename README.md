@@ -20,3 +20,9 @@
 -   screen space shadows (https://panoskarabelas.com/posts/screen_space_shadows/)
 -   astroid cluster, ring, render haze around ring
 -   look at star citizen, ghost of tsushima and space repo for features
+-   webgpu offscreen canvas
+-   worker multi threading
+-   compute shader
+-   deferred shading
+-   gpu quadtree, quadtree compute shader
+-   grass shading phong & color along blade, curved normals? turn around randomly with tilt towards camera, animate with wind field, random grass scale, perlin distribution with clumps, look for other basics then, optimization and scalinf
