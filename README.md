@@ -26,3 +26,6 @@
 -   deferred shading
 -   gpu quadtree, quadtree compute shader
 -   grass shading phong & color along blade, curved normals? turn around randomly with tilt towards camera, animate with wind field, random grass scale, perlin distribution with clumps, look for other basics then, optimization and scalinf
+-   gpu floating origin https://godotengine.org/article/emulating-double-precision-gpu-render-large-worlds/
+-   drawindircet https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/drawIndirect
+-   gpu frustum culling
