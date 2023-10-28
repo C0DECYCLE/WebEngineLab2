@@ -64,7 +64,7 @@ const renderModule: GPUShaderModule = device.createShaderModule({
 
 //////////// PIPELINE ////////////
 
-const computePipeline = device.createComputePipeline({
+const computePipeline: GPUComputePipeline = device.createComputePipeline({
     label: "compute pipeline",
     layout: "auto",
     compute: {
@@ -105,12 +105,13 @@ const colorAttachment: GPURenderPassColorAttachment = {
     storeOp: "store",
 } as GPURenderPassColorAttachment;
 
-const depthTexture = device.createTexture({
+const depthTexture: GPUTexture = device.createTexture({
     label: "depth texture",
     size: [canvas.width, canvas.height],
     format: "depth24plus",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
-});
+} as GPUTextureDescriptor);
+
 const depthStencilAttachment: GPURenderPassDepthStencilAttachment = {
     label: "depth stencil attachment",
     view: depthTexture.createView(),
@@ -138,7 +139,7 @@ const uniformBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-const uniformArrayBuffer = new ArrayBuffer(uniformBufferSize);
+const uniformArrayBuffer: ArrayBuffer = new ArrayBuffer(uniformBufferSize);
 const floatValues: Float32Array = new Float32Array(uniformArrayBuffer);
 const intValues: Uint32Array = new Uint32Array(uniformArrayBuffer);
 
@@ -166,7 +167,7 @@ const parser: OBJParser = new OBJParser();
 const vertexData: Float32Array = parser.parse(raw);
 const vertexCount: int = vertexData.length / 4;
 
-const vertexArrayBuffer = vertexData.buffer;
+const vertexArrayBuffer: ArrayBuffer = vertexData.buffer;
 const verteciesBuffer: GPUBuffer = device.createBuffer({
     label: "vertices storage buffer",
     size: vertexArrayBuffer.byteLength,
@@ -179,7 +180,7 @@ device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
 
 //////////// INSTANCES ////////////
 
-const instanceCount: int = 1_000;
+const instanceCount: int = 10_000;
 
 const instancesBuffer: GPUBuffer = device.createBuffer({
     label: "instances storage buffer",
@@ -188,6 +189,24 @@ const instancesBuffer: GPUBuffer = device.createBuffer({
 } as GPUBufferDescriptor);
 
 log(dotit(instanceCount));
+
+//////////// INDIRECT ////////////
+
+const indirectData: Uint32Array = new Uint32Array([
+    vertexCount,
+    instanceCount,
+    0,
+    0,
+]);
+
+const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
+const indirectBuffer: GPUBuffer = device.createBuffer({
+    label: "indirect buffer",
+    size: 4 * byteSize,
+    usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+
+device.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
 
 //////////// BINDGROUP ////////////
 
@@ -227,12 +246,12 @@ const computeEncoder: GPUCommandEncoder = device!.createCommandEncoder({
     label: "compute command encoder",
 } as GPUObjectDescriptorBase);
 
-const computePass = computeEncoder.beginComputePass({
+const computePass: GPUComputePassEncoder = computeEncoder.beginComputePass({
     label: "compute pass",
 } as GPUComputePassDescriptor);
 computePass.setPipeline(computePipeline);
 computePass.setBindGroup(0, computeBindGroup);
-computePass.dispatchWorkgroups(instanceCount, 1, 1);
+computePass.dispatchWorkgroups(instanceCount / 100, 1, 1);
 computePass.end();
 
 const computeCommandBuffer: GPUCommandBuffer = computeEncoder.finish();
@@ -249,7 +268,7 @@ const projection: Mat4 = Mat4.Perspective(
 );
 const viewProjection: Mat4 = new Mat4();
 
-const cameraPos: Vec3 = new Vec3(0.0, 2.0, 2.0);
+const cameraPos: Vec3 = new Vec3(0.0, 6.0, 2.0);
 const cameraDir: Vec3 = new Vec3(0.0, 0.5, 1.0).normalize();
 const up: Vec3 = new Vec3(0.0, 1.0, 0.0);
 
@@ -270,10 +289,35 @@ const stats: Stats = new Stats();
 stats.set("frame delta", 0);
 stats.show();
 
+//////////// RENDER BUNDLE ////////////
+
+function draw(
+    renderEncoder: GPURenderPassEncoder | GPURenderBundleEncoder,
+): void {
+    renderEncoder.setPipeline(renderPipeline);
+    renderEncoder.setBindGroup(0, renderBindGroup);
+    renderEncoder.drawIndirect(indirectBuffer, 0);
+    /*
+    for (let i: int = 0; i < instanceCount; i++) {
+        renderEncoder.draw(vertexCount, 1, 0, i);
+    }
+    */
+}
+
+const renderBundleEncoder: GPURenderBundleEncoder =
+    device.createRenderBundleEncoder({
+        label: "render bundle",
+        colorFormats: [presentationFormat],
+        depthStencilFormat: "depth24plus",
+    } as GPURenderBundleEncoderDescriptor);
+draw(renderBundleEncoder);
+const renderBundle: GPURenderBundle = renderBundleEncoder.finish();
+
 async function render(now: float): Promise<void> {
     stats.time("cpu delta");
 
     //////////// UPDATE ////////////
+
     control.update();
 
     view.view(cameraPos, cameraDir, up);
@@ -303,9 +347,14 @@ async function render(now: float): Promise<void> {
 
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
-    renderPass.setPipeline(renderPipeline);
-    renderPass.setBindGroup(0, renderBindGroup);
-    renderPass.draw(vertexCount, instanceCount);
+
+    const useRenderBundles: boolean = true;
+    if (useRenderBundles) {
+        renderPass.executeBundles([renderBundle]);
+    } else {
+        draw(renderPass);
+    }
+
     renderPass.end();
 
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
