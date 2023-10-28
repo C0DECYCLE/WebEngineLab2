@@ -3,9 +3,10 @@
     "version": "0.1.0",
     "type": "module",
     "scripts": {
-        "install": "npm install",
-        "build": "clear && npx tsc",
-        "test": "clear && node --experimental-vm-modules node_modules/.bin/jest"
+        "build-macos": "clear && npx tsc",
+        "build-win32": "cls && npx tsc",
+        "test-macos": "clear && node --experimental-vm-modules node_modules/.bin/jest",
+        "test-win32": "cls && node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
     },
     "repository": {
         "type": "git",
