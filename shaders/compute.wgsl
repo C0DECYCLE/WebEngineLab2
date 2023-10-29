@@ -15,10 +15,14 @@ const spread: f32 = 30.0;
     @builtin(global_invocation_id) id: vec3<u32>
 ) {
     let instanceIndex: u32 = id.x;
+    let col: f32 = floor(f32(instanceIndex) / 100);
+    let row: f32 = f32(instanceIndex % 100);
     var position: vec3f = vec3f(
-        noise(f32(instanceIndex) * 0.456 + 213.534) * spread - spread * 0.5,
+        row * 0.02 * spread - spread * 0.5,
+        //noise(f32(instanceIndex) * 0.456 + 213.534) * spread - spread * 0.5,
         0.0,
-        noise(f32(instanceIndex) * 0.915 - 610.812) * spread - spread * 0.5
+        col * 0.02 * spread - spread * 0.5
+        //noise(f32(instanceIndex) * 0.915 - 610.812) * spread - spread * 0.5
     );
     //position.y = abs(perlinNoise2(position.xz * 0.05)) * 5.0;
     let radian: f32 = noise(f32(instanceIndex) * 0.712 + 918.782) * 6.3;

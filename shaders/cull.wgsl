@@ -32,12 +32,12 @@ struct Indirect {
     let instance: Instance = instances[instanceIndex];
 
     if (instanceIndex == 0) {
-        atomicStore(&draw.instanceCount, 10000);
+        atomicStore(&draw.instanceCount, /*10000*/ 0);
     }
 
     var position: vec3f = vec3f(instance.matrix[0][3], instance.matrix[1][3], instance.matrix[2][3]);
     var viewspace: vec4f = uniforms.viewProjection * vec4f(position, 1.0);
-    /*
+    
     var clipspace: vec3f = viewspace.xyz;
     clipspace /= -viewspace.w;
 
@@ -45,11 +45,11 @@ struct Indirect {
     clipspace.y = clipspace.y / 2.0 + 0.5;
     clipspace.z = -viewspace.w;
 
-    if (clipspace.x > 0.1 && clipspace.x < 0.9 && clipspace.y > 0.1 && clipspace.y < 0.9) {
+    if (clipspace.x > 0.05 && clipspace.x < 0.95 && clipspace.y > 0.1 && clipspace.y < 1.0) {
         let index: u32 = atomicAdd(&draw.instanceCount, 1);
         culled[index] = instance;
     }
-    */
+    
 
-    culled[instanceIndex] = instance;
+    //culled[instanceIndex] = instance;
 }
