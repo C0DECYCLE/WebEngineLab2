@@ -21,7 +21,7 @@ struct Indirect {
 };
 
 @group(0) @binding(0) var<storage, read> instances: array<Instance>;
-@group(0) @binding(1) var<storage, read_write> draw: array<Indirect>;
+@group(0) @binding(1) var<storage, read_write> draw: Indirect;
 @group(0) @binding(2) var<storage, read_write> culled: array<Instance>;
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
 
@@ -32,12 +32,12 @@ struct Indirect {
     let instance: Instance = instances[instanceIndex];
 
     if (instanceIndex == 0) {
-        atomicStore(&draw[0].instanceCount, 0);
+        atomicStore(&draw.instanceCount, 10000);
     }
 
     var position: vec3f = vec3f(instance.matrix[0][3], instance.matrix[1][3], instance.matrix[2][3]);
     var viewspace: vec4f = uniforms.viewProjection * vec4f(position, 1.0);
-    
+    /*
     var clipspace: vec3f = viewspace.xyz;
     clipspace /= -viewspace.w;
 
@@ -46,7 +46,10 @@ struct Indirect {
     clipspace.z = -viewspace.w;
 
     if (clipspace.x > 0.1 && clipspace.x < 0.9 && clipspace.y > 0.1 && clipspace.y < 0.9) {
-        let index: u32 = atomicAdd(&draw[0].instanceCount, 1);
+        let index: u32 = atomicAdd(&draw.instanceCount, 1);
         culled[index] = instance;
     }
+    */
+
+    culled[instanceIndex] = instance;
 }

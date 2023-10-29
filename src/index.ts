@@ -228,16 +228,18 @@ const indirectBuffer: GPUBuffer = device.createBuffer({
     usage:
         GPUBufferUsage.STORAGE |
         GPUBufferUsage.INDIRECT |
-        GPUBufferUsage.COPY_DST |
-        GPUBufferUsage.COPY_SRC,
+        GPUBufferUsage.COPY_DST /* |
+        GPUBufferUsage.COPY_SRC*/,
 } as GPUBufferDescriptor);
 
 device.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
 
+/*
 const readbackBuffer: GPUBuffer = device.createBuffer({
     size: 4 * byteSize,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
+*/
 
 //////////// BINDGROUP ////////////
 
@@ -418,6 +420,7 @@ async function render(now: float): Promise<void> {
     }
     renderPass.end();
 
+    /*
     renderEncoder.copyBufferToBuffer(
         indirectBuffer,
         0,
@@ -425,18 +428,20 @@ async function render(now: float): Promise<void> {
         0,
         readbackBuffer.size,
     );
+    */
 
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
     device?.queue.submit([renderCommandBuffer]);
 
-    await readbackBuffer.mapAsync(GPUMapMode.READ).then(() => {
-        const result: Uint32Array = new Uint32Array(
-            readbackBuffer.getMappedRange().slice(0),
-        );
-        readbackBuffer.unmap();
-        //log(dotit(result[1]));
-        stats.set("cull", result[1]);
-    });
+    /*
+    await readbackBuffer.mapAsync(GPUMapMode.READ);
+    const result: Uint32Array = new Uint32Array(
+        readbackBuffer.getMappedRange().slice(0),
+    );
+    readbackBuffer.unmap();
+    //log(dotit(result[1]));
+    stats.set("cull", result[1]);
+    */
 
     //////////// FRAME ////////////
 
