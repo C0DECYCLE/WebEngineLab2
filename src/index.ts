@@ -55,6 +55,13 @@ const computeModule: GPUShaderModule = device.createShaderModule({
     ),
 } as GPUShaderModuleDescriptor);
 
+const cullModule: GPUShaderModule = device.createShaderModule({
+    label: "cull shader",
+    code: await fetch("./shaders/cull.wgsl").then(
+        async (response: Response) => await response.text(),
+    ),
+} as GPUShaderModuleDescriptor);
+
 const renderModule: GPUShaderModule = device.createShaderModule({
     label: "render shader",
     code: await fetch("./shaders/render.wgsl").then(
@@ -70,6 +77,15 @@ const computePipeline: GPUComputePipeline = device.createComputePipeline({
     compute: {
         module: computeModule,
         entryPoint: "computeInstance",
+    } as GPUProgrammableStage,
+} as GPUComputePipelineDescriptor);
+
+const cullPipeline: GPUComputePipeline = device.createComputePipeline({
+    label: "cull pipeline",
+    layout: "auto",
+    compute: {
+        module: cullModule,
+        entryPoint: "cullInstance",
     } as GPUProgrammableStage,
 } as GPUComputePipelineDescriptor);
 
@@ -188,13 +204,19 @@ const instancesBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
+const cullBuffer: GPUBuffer = device.createBuffer({
+    label: "cull storage buffer",
+    size: instanceCount * 4 * 4 * byteSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+
 log(dotit(instanceCount));
 
 //////////// INDIRECT ////////////
 
 const indirectData: Uint32Array = new Uint32Array([
     vertexCount,
-    instanceCount,
+    0, //instanceCount,
     0,
     0,
 ]);
@@ -203,10 +225,19 @@ const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
     size: 4 * byteSize,
-    usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+    usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.INDIRECT |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
 } as GPUBufferDescriptor);
 
 device.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
+
+const readbackBuffer: GPUBuffer = device.createBuffer({
+    size: 4 * byteSize,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+});
 
 //////////// BINDGROUP ////////////
 
@@ -217,6 +248,29 @@ const computeBindGroup: GPUBindGroup = device.createBindGroup({
         {
             binding: 0,
             resource: { buffer: instancesBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+    ],
+} as GPUBindGroupDescriptor);
+
+const cullBindGroup: GPUBindGroup = device.createBindGroup({
+    label: "cull bind group",
+    layout: cullPipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: { buffer: instancesBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 1,
+            resource: { buffer: indirectBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 2,
+            resource: { buffer: cullBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 3,
+            resource: { buffer: uniformBuffer } as GPUBindingResource,
         } as GPUBindGroupEntry,
     ],
 } as GPUBindGroupDescriptor);
@@ -235,7 +289,7 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
         } as GPUBindGroupEntry,
         {
             binding: 2,
-            resource: { buffer: instancesBuffer } as GPUBindingResource,
+            resource: { buffer: cullBuffer } as GPUBindingResource,
         } as GPUBindGroupEntry,
     ],
 } as GPUBindGroupDescriptor);
@@ -287,6 +341,7 @@ canvas.addEventListener("click", () => {
 
 const stats: Stats = new Stats();
 stats.set("frame delta", 0);
+stats.set("cull", 0);
 stats.show();
 
 //////////// RENDER BUNDLE ////////////
@@ -345,20 +400,43 @@ async function render(now: float): Promise<void> {
         label: "render command encoder",
     } as GPUObjectDescriptorBase);
 
+    const cullPass: GPUComputePassEncoder = renderEncoder.beginComputePass({
+        label: "cull pass",
+    } as GPUComputePassDescriptor);
+    cullPass.setPipeline(cullPipeline);
+    cullPass.setBindGroup(0, cullBindGroup);
+    cullPass.dispatchWorkgroups(instanceCount / 100, 1, 1);
+    cullPass.end();
+
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
-
     const useRenderBundles: boolean = true;
     if (useRenderBundles) {
         renderPass.executeBundles([renderBundle]);
     } else {
         draw(renderPass);
     }
-
     renderPass.end();
+
+    renderEncoder.copyBufferToBuffer(
+        indirectBuffer,
+        0,
+        readbackBuffer,
+        0,
+        readbackBuffer.size,
+    );
 
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
     device?.queue.submit([renderCommandBuffer]);
+
+    await readbackBuffer.mapAsync(GPUMapMode.READ).then(() => {
+        const result: Uint32Array = new Uint32Array(
+            readbackBuffer.getMappedRange().slice(0),
+        );
+        readbackBuffer.unmap();
+        //log(dotit(result[1]));
+        stats.set("cull", result[1]);
+    });
 
     //////////// FRAME ////////////
 
@@ -374,7 +452,8 @@ async function render(now: float): Promise<void> {
             <b>cpu rate: ${(1_000 / stats.get("cpu delta")!).toFixed(
                 1,
             )} fps</b><br>
-            cpu delta: ${stats.get("cpu delta")!.toFixed(2)} ms
+            cpu delta: ${stats.get("cpu delta")!.toFixed(2)} ms<br><br>
+            cull: ${stats.get("cull")}
     `);
     stats.set("frame delta", now);
 

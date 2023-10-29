@@ -34,14 +34,16 @@ struct VertexShaderOut {
 ) -> VertexShaderOut {
     let vertex: Vertex = vertecies[vertexIndex];
     let instance: Instance = instances[instanceIndex];
-    var instancePosition: vec3f = (instance.matrix * vec4f(0.0, 0.0, 0.0, 1.0)).xyz;
+
     var position: vec3f = vertex.position;
     position.z += cos(position.y) - 1.0;
     position = (vec4f(position, 1.0) * instance.matrix).xyz;
+    
     var windStrength: f32 = position.y * perlinNoise2(position.xz * 0.05 + uniforms.time * 0.001) * 0.35;
     var windDirection: vec2f = vec2f(cos(uniforms.time * 0.0001), sin(uniforms.time * 0.0001));
     position.x += windDirection.x * windStrength;
     position.z += windDirection.y * windStrength;
+
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1.0);
     out.worldPosition = position;
