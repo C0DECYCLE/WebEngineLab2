@@ -145,24 +145,24 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
 //////////// UNIFORM ////////////
 
 const byteSize: int = 4;
-const uniformBufferSize: int = 16 * byteSize + 1 * byteSize + 1 * byteSize;
+const uniformBufferSize: int = 16 * byteSize + 1 * byteSize; /* + 1 * byteSize*/
 
+/*(4 * byteSize - (uniformBufferSize % (4 * byteSize)))*/
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
-    size:
-        uniformBufferSize +
-        (4 * byteSize - (uniformBufferSize % (4 * byteSize))),
+    size: uniformBufferSize + 3 * byteSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
 const uniformArrayBuffer: ArrayBuffer = new ArrayBuffer(uniformBufferSize);
 const floatValues: Float32Array = new Float32Array(uniformArrayBuffer);
-const intValues: Uint32Array = new Uint32Array(uniformArrayBuffer);
+//const intValues: Uint32Array = new Uint32Array(uniformArrayBuffer);
 
 const matrixOffset: int = 0;
-const modeOffset: int = 16;
-const timeOffset: int = 17;
+const timeOffset: int = 16;
+//const modeOffset: int = 17;
 
+/*
 (window as any).setMode = (mode: 0 | 1 | 2) => {
     intValues[modeOffset] = mode;
     device?.queue.writeBuffer(
@@ -173,6 +173,7 @@ const timeOffset: int = 17;
     );
 };
 (window as any).setMode(2);
+*/
 
 //////////// VERTECIES ////////////
 
@@ -228,18 +229,16 @@ const indirectBuffer: GPUBuffer = device.createBuffer({
     usage:
         GPUBufferUsage.STORAGE |
         GPUBufferUsage.INDIRECT |
-        GPUBufferUsage.COPY_DST /* |
-        GPUBufferUsage.COPY_SRC*/,
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
 } as GPUBufferDescriptor);
 
 device.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
 
-/*
 const readbackBuffer: GPUBuffer = device.createBuffer({
     size: 4 * byteSize,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
-*/
 
 //////////// BINDGROUP ////////////
 
@@ -393,12 +392,12 @@ async function render(now: float): Promise<void> {
         timeOffset * byteSize,
     );
 
+    device?.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
+
     //////////// DRAW ////////////
 
     colorAttachment.view = context!.getCurrentTexture().createView();
     depthStencilAttachment.view = depthTexture.createView();
-
-    device?.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
 
     const renderEncoder: GPUCommandEncoder = device!.createCommandEncoder({
         label: "render command encoder",
@@ -422,28 +421,29 @@ async function render(now: float): Promise<void> {
     }
     renderPass.end();
 
-    /*
-    renderEncoder.copyBufferToBuffer(
-        indirectBuffer,
-        0,
-        readbackBuffer,
-        0,
-        readbackBuffer.size,
-    );
-    */
+    if (readbackBuffer.mapState === "unmapped") {
+        renderEncoder.copyBufferToBuffer(
+            indirectBuffer,
+            0,
+            readbackBuffer,
+            0,
+            readbackBuffer.size,
+        );
+    }
 
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
     device?.queue.submit([renderCommandBuffer]);
 
-    /*
-    await readbackBuffer.mapAsync(GPUMapMode.READ);
-    const result: Uint32Array = new Uint32Array(
-        readbackBuffer.getMappedRange().slice(0),
-    );
-    readbackBuffer.unmap();
-    //log(dotit(result[1]));
-    stats.set("cull", result[1]);
-    */
+    if (readbackBuffer.mapState === "unmapped") {
+        readbackBuffer.mapAsync(GPUMapMode.READ).then(() => {
+            const result: Uint32Array = new Uint32Array(
+                readbackBuffer.getMappedRange().slice(0),
+            );
+            readbackBuffer.unmap();
+            //log(dotit(result[1]));
+            stats.set("cull", result[1]);
+        });
+    }
 
     //////////// FRAME ////////////
 
@@ -460,7 +460,7 @@ async function render(now: float): Promise<void> {
                 1,
             )} fps</b><br>
             cpu delta: ${stats.get("cpu delta")!.toFixed(2)} ms<br><br>
-            cull: ${stats.get("cull")}
+            unculled: ${stats.get("cull")}
     `);
     stats.set("frame delta", now);
 

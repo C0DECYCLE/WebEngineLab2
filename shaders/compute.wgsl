@@ -38,18 +38,10 @@ const spread: f32 = 30.0;
     instances[instanceIndex] = Instance(matrix);
 }
 
-fn rand(n: f32) -> f32 {
-    return fract(sin(n) * 43758.5453123);
-}
-
-fn noise(p: f32) -> f32 {
-    let fl = floor(p);
-    return mix(rand(fl), rand(fl + 1.), fract(p));
-}
-
+fn rand(n: f32) -> f32 { return fract(sin(n) * 43758.5453123); }
+fn noise(p: f32) -> f32 { let fl = floor(p); return mix(rand(fl), rand(fl + 1.), fract(p)); }
 fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
 fn fade2(t: vec2f) -> vec2f { return t * t * t * (t * (t * 6. - 15.) + 10.); }
-
 fn perlinNoise2(P: vec2f) -> f32 {
     var Pi: vec4f = floor(P.xyxy) + vec4f(0., 0., 1., 1.);
     let Pf = fract(P.xyxy) - vec4f(0., 0., 1., 1.);

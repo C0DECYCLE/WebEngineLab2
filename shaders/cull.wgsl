@@ -5,8 +5,8 @@
 
 struct Uniforms {
     viewProjection: mat4x4f,
-    mode: u32, // 0: triangle, 1: normal, 2: grass
     time: f32
+    //mode: u32, // 0: triangle, 1: normal, 2: grass
 };
 
 struct Instance {
@@ -46,7 +46,4 @@ struct Indirect {
         let index: u32 = atomicAdd(&draw.instanceCount, 1);
         culled[index] = instance;
     }
-    
-
-    //culled[instanceIndex] = instance;
 }

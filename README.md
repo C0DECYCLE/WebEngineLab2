@@ -31,4 +31,4 @@
 -   [ ] grass perlin distribution with clumps, look for other basics then, optimization
 -   [ ] gpu floating origin https://godotengine.org/article/emulating-double-precision-gpu-render-large-worlds/
 -   [ ] drawindircet https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/drawIndirect
--   [ ] gpu frustum culling
+-   [x] gpu frustum culling
