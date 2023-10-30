@@ -398,6 +398,8 @@ async function render(now: float): Promise<void> {
     colorAttachment.view = context!.getCurrentTexture().createView();
     depthStencilAttachment.view = depthTexture.createView();
 
+    device?.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
+
     const renderEncoder: GPUCommandEncoder = device!.createCommandEncoder({
         label: "render command encoder",
     } as GPUObjectDescriptorBase);
