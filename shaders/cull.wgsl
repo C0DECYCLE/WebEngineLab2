@@ -41,8 +41,8 @@ struct Indirect {
     clipspace.y = clipspace.y / 2.0 + 0.5;
     clipspace.z = -viewspace.w;
 
-    if (clipspace.x > 0.05 && clipspace.x < 0.95 && clipspace.y > 0.05 && clipspace.y < 0.95) {
-    //if (clipspace.x > 0.0 && clipspace.x < 1.0 && clipspace.y > -0.2 && clipspace.y < 1.2) {
+    if (clipspace.x > 0.05 && clipspace.x < 0.95 && clipspace.y > 0.05 && clipspace.y < 0.95 && clipspace.z < 0.0) {
+    //if (clipspace.x > 0.0 && clipspace.x < 1.0 && clipspace.y > -0.2 && clipspace.y < 1.2 && clipspace.z < 0.0) {
         let index: u32 = atomicAdd(&draw.instanceCount, 1);
         culled[index] = instance;
     }

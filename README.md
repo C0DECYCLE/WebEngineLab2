@@ -9,9 +9,9 @@
 -   [ ] entity graph
 -   [ ] astroneer look
 -   [ ] cloth simulation
--   [ ] scattering system 100% gpu
+-   [x] scattering system 100% gpu
 -   [ ] object container streaming
--   [ ] gpu folliage
+-   [x] gpu folliage
 -   [ ] ghost of tsushima techniques (https://www.youtube.com/results?search_query=ghost+of+tsushima+gdc)
 -   [x] gpu grass
 -   [ ] screen space particles
@@ -25,10 +25,13 @@
 -   [x] compute shader
 -   [ ] deferred shading
 -   [ ] gpu quadtree, quadtree compute shader
--   [ ] grass shading phong & color along blade, curved normals?
--   [ ] grass turn around randomly with tilt towards camera
--   [ ] grass animate with wind field, random grass scale,
--   [ ] grass perlin distribution with clumps, look for other basics then, optimization
+-   [x] grass shading phong & color along blade, curved normals?
+-   [x] grass turn around randomly with tilt towards camera
+-   [x] grass animate with wind field, random grass scale,
+-   [x] grass perlin distribution with clumps, look for other basics then, optimization
 -   [ ] gpu floating origin https://godotengine.org/article/emulating-double-precision-gpu-render-large-worlds/
--   [ ] drawindircet https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/drawIndirect
+-   [x] drawindircet https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/drawIndirect
 -   [x] gpu frustum culling
+-   [ ] gpu timing
+
+//timing, better wind via cull shader not vertex, optimize stuff into computes, better distribution
