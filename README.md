@@ -32,6 +32,8 @@
 -   [ ] gpu floating origin https://godotengine.org/article/emulating-double-precision-gpu-render-large-worlds/
 -   [x] drawindircet https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/drawIndirect
 -   [x] gpu frustum culling
--   [ ] gpu timing
+-   [x] gpu timing
+-   [ ] https://math.hws.edu/graphicsbook/c9/s2.html
 
-//timing, better wind via cull shader not vertex, optimize stuff into computes, better distribution
+//better wind via cull shader not vertex, optimize stuff into computes, better distribution
+//indexed drawing, write down all things from ghost of tsushima grass, optimize current, restart with plan for only grass or do engine, bézier curve

@@ -14,7 +14,7 @@ import { log } from "./utilities/logger.js";
 import { Vec3 } from "./utilities/Vec3.js";
 import { Mat4 } from "./utilities/Mat4.js";
 import { Controller } from "./Controller.js";
-import { OBJParser } from "./OBJParser.js";
+import { OBJParseResult, OBJParser } from "./OBJParser.js";
 import { Stats } from "./Stats.js";
 
 function createCanvas(): HTMLCanvasElement {
@@ -201,19 +201,30 @@ const raw: string = await fetch("./resources/grass.obj").then(
     async (response: Response) => await response.text(),
 );
 const parser: OBJParser = new OBJParser();
-const vertexData: Float32Array = parser.parse(raw);
-const vertexCount: int = vertexData.length / 4;
+const data: OBJParseResult = parser.parse(raw, true);
+const vertexCount: int = data.indicies!.length;
 
-const vertexArrayBuffer: ArrayBuffer = vertexData.buffer;
+log(parser.parse(raw));
+log(parser.parse(raw, true));
+
+const vertexArrayBuffer: ArrayBuffer = data.positions.buffer;
 const verteciesBuffer: GPUBuffer = device.createBuffer({
     label: "vertices storage buffer",
     size: vertexArrayBuffer.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-log(dotit(vertexCount));
+const indexArrayBuffer: ArrayBuffer = data.indicies!.buffer;
+const indicesBuffer: GPUBuffer = device.createBuffer({
+    label: "index buffer",
+    size: indexArrayBuffer.byteLength,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
 
+device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
 device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
+
+log(dotit(vertexCount));
 
 //////////// INSTANCES ////////////
 
@@ -236,8 +247,9 @@ log(dotit(instanceCount));
 //////////// INDIRECT ////////////
 
 const indirectData: Uint32Array = new Uint32Array([
-    vertexCount,
+    vertexCount, //aka indexCount
     0, //instanceCount,
+    0,
     0,
     0,
 ]);
@@ -245,7 +257,7 @@ const indirectData: Uint32Array = new Uint32Array([
 const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
-    size: 4 * byteSize,
+    size: 5 * byteSize,
     usage:
         GPUBufferUsage.INDIRECT |
         GPUBufferUsage.STORAGE |
@@ -394,9 +406,11 @@ function draw(
 ): void {
     renderEncoder.setPipeline(renderPipeline);
     renderEncoder.setBindGroup(0, renderBindGroup);
-    renderEncoder.drawIndirect(indirectBuffer, 0);
+    renderEncoder.setIndexBuffer(indicesBuffer, "uint32");
+    renderEncoder.drawIndexedIndirect(indirectBuffer, 0);
     /*
     for (let i: int = 0; i < instanceCount; i++) {
+        //out of date! now indexed!
         renderEncoder.draw(vertexCount, 1, 0, i);
     }
     */

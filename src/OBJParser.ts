@@ -6,65 +6,79 @@
 import { int, float, Nullable } from "../types/utilities/utils.type.js";
 import { clear } from "./utilities/utils.js";
 
-type OBJPolygon = [float, float, float];
+type OBJVertex = [float, float, float];
+export type OBJParseResult = {
+    positions: Float32Array;
+    indicies?: Uint32Array;
+};
 
 export class OBJParser {
-    private readonly vertices: float[] = [];
-    private readonly polygons: OBJPolygon[] = [];
+    private readonly vertexCache: OBJVertex[] = [];
+    private readonly positionCache: float[] = [];
+    private readonly indexCache: int[] = [];
 
-    public parse(raw: string): Float32Array {
+    public parse(raw: string, indexed: boolean = false): OBJParseResult {
         this.reset();
-        this.polygons.push([0.0, 0.0, 0.0]);
         const regExp: RegExp = /(\w*)(?: )*(.*)/;
         const lines: string[] = raw.split("\n");
         for (let i: int = 0; i < lines.length; ++i) {
-            this.parseLine(regExp, lines[i].trim());
+            this.parseLine(regExp, lines[i].trim(), indexed);
         }
-        const result: Float32Array = new Float32Array(this.vertices);
+        const result: OBJParseResult = {
+            positions: new Float32Array(this.positionCache),
+        } as OBJParseResult;
+        if (indexed) {
+            result.indicies = new Uint32Array(this.indexCache);
+        }
         this.reset();
         return result;
     }
 
-    private parseLine(regExp: RegExp, line: string): void {
+    private parseLine(regExp: RegExp, line: string, indexed: boolean): void {
         const m: Nullable<RegExpExecArray> = regExp.exec(line);
         if (line === "" || line.startsWith("#") || !m) {
             return;
         }
-        const [, keyword, _unparsedArgs] = m;
         const parts: string[] = line.split(/\s+/).slice(1);
-        switch (keyword) {
+        switch (m[1]) {
             case "v":
-                return this.keywordV(parts);
+                return this.keywordV(parts, indexed);
             case "f":
-                return this.keywordF(parts);
-            default:
-                return;
+                return this.keywordF(parts, indexed);
         }
     }
 
-    private keywordV(parts: string[]): void {
+    private keywordV(parts: string[], indexed: boolean): void {
         if (parts.length < 3) {
             throw new Error(`ObjParser: Obj file missing vertex part.`);
         }
-        this.polygons.push([
-            parseFloat(parts[0]),
-            parseFloat(parts[1]),
-            parseFloat(parts[2]),
-        ]);
+        const x: float = parseFloat(parts[0]);
+        const y: float = parseFloat(parts[1]);
+        const z: float = parseFloat(parts[2]);
+        this.vertexCache.push([x, y, z]);
+        if (!indexed) {
+            return;
+        }
+        this.positionCache.push(x, y, z, 0.0);
     }
 
-    private keywordF(parts: string[]): void {
-        const a: int = parseInt(parts[0]);
-        const b: int = parseInt(parts[1]);
-        const c: int = parseInt(parts[2]);
-        this.vertices.push(...this.polygons[a].slice(0, 3), 0.0);
-        this.vertices.push(...this.polygons[b].slice(0, 3), 0.0);
-        this.vertices.push(...this.polygons[c].slice(0, 3), 0.0);
+    private keywordF(parts: string[], indexed: boolean): void {
+        const a: int = parseInt(parts[0]) - 1;
+        const b: int = parseInt(parts[1]) - 1;
+        const c: int = parseInt(parts[2]) - 1;
+        if (!indexed) {
+            this.positionCache.push(...this.vertexCache[a].slice(0, 3), 0.0);
+            this.positionCache.push(...this.vertexCache[b].slice(0, 3), 0.0);
+            this.positionCache.push(...this.vertexCache[c].slice(0, 3), 0.0);
+            return;
+        }
+        this.indexCache.push(a, b, c);
     }
 
     public reset(): void {
-        clear(this.vertices);
-        clear(this.polygons);
+        clear(this.vertexCache);
+        clear(this.positionCache);
+        clear(this.indexCache);
     }
 
     public destroy(): void {
