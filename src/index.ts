@@ -48,6 +48,8 @@ context.configure({
     format: presentationFormat,
 } as GPUCanvasConfiguration);
 
+//const sampleCount: int = 4;
+
 //////////// SHADER ////////////
 
 const computeModule: GPUShaderModule = device.createShaderModule({
@@ -111,21 +113,37 @@ const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
         depthCompare: "less",
         format: "depth24plus",
     } as GPUDepthStencilState,
+    /*
+    multisample: {
+        count: sampleCount,
+    } as GPUMultisampleState,
+    */
 } as GPURenderPipelineDescriptor);
 
 //////////// RENDERPASS ////////////
+/*
+const viewTexture: GPUTexture = device.createTexture({
+    label: "view texture",
+    size: [canvas.width, canvas.height],
+    sampleCount: sampleCount,
+    format: presentationFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+} as GPUTextureDescriptor);
+*/
 
 const colorAttachment: GPURenderPassColorAttachment = {
     label: "color attachment",
-    view: context!.getCurrentTexture().createView(),
+    view: context!.getCurrentTexture().createView(), //viewTexture.createView(),
+    //resolveTarget: context!.getCurrentTexture().createView(),
     clearValue: [0.3, 0.3, 0.3, 1.0],
     loadOp: "clear",
-    storeOp: "store",
+    storeOp: "store", //"discard",
 } as GPURenderPassColorAttachment;
 
 const depthTexture: GPUTexture = device.createTexture({
     label: "depth texture",
     size: [canvas.width, canvas.height],
+    //sampleCount: sampleCount,
     format: "depth24plus",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
 } as GPUTextureDescriptor);
@@ -135,7 +153,7 @@ const depthStencilAttachment: GPURenderPassDepthStencilAttachment = {
     view: depthTexture.createView(),
     depthClearValue: 1.0,
     depthLoadOp: "clear",
-    depthStoreOp: "store",
+    depthStoreOp: "store", //"discard",
 } as GPURenderPassDepthStencilAttachment;
 
 const renderPassDescriptor: GPURenderPassDescriptor = {
@@ -339,7 +357,7 @@ device!.queue.submit([computeCommandBuffer]);
 
 //////////// MATRIX ////////////
 
-const view: Mat4 = new Mat4();
+const cameraView: Mat4 = new Mat4();
 const projection: Mat4 = Mat4.Perspective(
     60 * toRadian,
     canvas.width / canvas.height,
@@ -354,13 +372,9 @@ const up: Vec3 = new Vec3(0.0, 1.0, 0.0);
 
 //////////// CONTROL ////////////
 
-const control: Controller = new Controller({
+const control: Controller = new Controller(canvas, {
     position: cameraPos,
     direction: cameraDir,
-});
-
-canvas.addEventListener("click", () => {
-    canvas.requestPointerLock();
 });
 
 //////////// STATS ////////////
@@ -392,6 +406,7 @@ const renderBundleEncoder: GPURenderBundleEncoder =
     device.createRenderBundleEncoder({
         label: "render bundle",
         colorFormats: [presentationFormat],
+        //sampleCount: sampleCount,
         depthStencilFormat: "depth24plus",
     } as GPURenderBundleEncoderDescriptor);
 draw(renderBundleEncoder);
@@ -404,8 +419,10 @@ async function render(now: float): Promise<void> {
 
     control.update();
 
-    view.view(cameraPos, cameraDir, up);
-    viewProjection.multiply(view, projection).store(floatValues, matrixOffset);
+    cameraView.view(cameraPos, cameraDir, up);
+    viewProjection
+        .multiply(cameraView, projection)
+        .store(floatValues, matrixOffset);
     device!.queue.writeBuffer(
         uniformBuffer,
         matrixOffset * byteSize,
@@ -423,6 +440,7 @@ async function render(now: float): Promise<void> {
     //////////// CULL DRAW ////////////
 
     colorAttachment.view = context!.getCurrentTexture().createView();
+    //colorAttachment.resolveTarget = context!.getCurrentTexture().createView();
     depthStencilAttachment.view = depthTexture.createView();
 
     device!.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
