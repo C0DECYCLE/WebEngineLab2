@@ -20,6 +20,31 @@ export class Stats {
         this.p = this.createP(this.div);
     }
 
+    private createDiv(): HTMLDivElement {
+        const div: HTMLDivElement = document.createElement("div");
+        div.style.position = "absolute";
+        div.style.top = "0px";
+        div.style.right = "0px";
+        div.style.minWidth = "30vh";
+        div.style.backgroundColor = "#000000";
+        div.style.opacity = "0.75";
+        return div;
+    }
+
+    private createP(div: HTMLDivElement): HTMLParagraphElement {
+        const p: HTMLDivElement = document.createElement("p");
+        p.style.margin = "2vh";
+        p.style.color = "#FFFFFF";
+        p.style.fontFamily = "system-ui";
+        p.style.fontSize = "1.2vh";
+        div.append(p);
+        return p;
+    }
+
+    public show(): void {
+        document.body.appendChild(this.div);
+    }
+
     public get(key: string): Undefinable<float> {
         return this.list.get(key);
     }
@@ -50,10 +75,6 @@ export class Stats {
         this.list.set(key, now - sub);
     }
 
-    public show(): void {
-        document.body.appendChild(this.div);
-    }
-
     public update(text: string): void {
         this.p.innerHTML = text;
     }
@@ -63,26 +84,5 @@ export class Stats {
             document.body.removeChild(this.div);
         }
         this.list.clear();
-    }
-
-    private createDiv(): HTMLDivElement {
-        const div: HTMLDivElement = document.createElement("div");
-        div.style.position = "absolute";
-        div.style.top = "0px";
-        div.style.right = "0px";
-        div.style.minWidth = "30vh";
-        div.style.backgroundColor = "#000000";
-        div.style.opacity = "0.75";
-        return div;
-    }
-
-    private createP(div: HTMLDivElement): HTMLParagraphElement {
-        const p: HTMLDivElement = document.createElement("p");
-        p.style.margin = "2vh";
-        p.style.color = "#FFFFFF";
-        p.style.fontFamily = "system-ui";
-        p.style.fontSize = "1.2vh";
-        div.append(p);
-        return p;
     }
 }

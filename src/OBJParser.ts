@@ -25,15 +25,6 @@ export class OBJParser {
         return result;
     }
 
-    public reset(): void {
-        clear(this.vertices);
-        clear(this.polygons);
-    }
-
-    public destroy(): void {
-        this.reset();
-    }
-
     private parseLine(regExp: RegExp, line: string): void {
         const m: Nullable<RegExpExecArray> = regExp.exec(line);
         if (line === "" || line.startsWith("#") || !m) {
@@ -69,5 +60,14 @@ export class OBJParser {
         this.vertices.push(...this.polygons[a].slice(0, 3), 0.0);
         this.vertices.push(...this.polygons[b].slice(0, 3), 0.0);
         this.vertices.push(...this.polygons[c].slice(0, 3), 0.0);
+    }
+
+    public reset(): void {
+        clear(this.vertices);
+        clear(this.polygons);
+    }
+
+    public destroy(): void {
+        this.reset();
     }
 }
