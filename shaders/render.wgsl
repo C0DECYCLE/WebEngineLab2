@@ -37,14 +37,21 @@ struct VertexShaderOut {
 
     var position: vec3f = vertex.position;
     position.z += cos(position.y) - 1.0;
-    //position.z += position.y;
+    /*
+    var a: vec3f = vec3f(0.0, 0.0, 0.0);
+    var b: vec3f = vec3f(0.0, 1.0, 0.0);
+    var c: vec3f = vec3f(0.0, 1.0, 1.0);
+    var p1: vec3f = mix(a, b, position.y);
+    var p2: vec3f = mix(b, c, position.y);
+    position += mix(p1, p2, position.y);
+    */
     position = (vec4f(position, 1.0) * instance.matrix).xyz;
     
     var windStrength: f32 = position.y * perlinNoise2(position.xz * 0.05 + uniforms.time * 0.001) * 0.35;
     var windDirection: vec2f = vec2f(cos(uniforms.time * 0.0001), sin(uniforms.time * 0.0001));
     position.x += windDirection.x * windStrength;
     position.z += windDirection.y * windStrength;
-
+    
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1.0);
     out.selfHeight = vertex.position.y;

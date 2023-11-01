@@ -14,8 +14,7 @@
 -   [x] gpu folliage
 -   [ ] ghost of tsushima techniques (https://www.youtube.com/results?search_query=ghost+of+tsushima+gdc)
 -   [x] gpu grass
--   [ ] screen space particles
--   [ ] gpu particles
+-   [ ] screen space gpu particles
 -   [ ] volumetric clouds
 -   [ ] screen space shadows (https://panoskarabelas.com/posts/screen_space_shadows/)
 -   [ ] astroid cluster, ring, render haze around ring
@@ -33,10 +32,9 @@
 -   [x] drawindircet https://developer.mozilla.org/en-US/docs/Web/API/GPURenderPassEncoder/drawIndirect
 -   [x] gpu frustum culling
 -   [x] gpu timing
--   [ ] https://math.hws.edu/graphicsbook/c9/s2.html
--   [ ] indexed drawing
+-   [x] https://math.hws.edu/graphicsbook/c9/s2.html
+-   [x] indexed drawing
+-   [x] bézier curve and smooth normals generated in vertex shader?
 
-//bézier curve and smooth normals generated in vertex shader?
 //write down all things from ghost of tsushima grass
-//optimize current?, stuff into computes
 //restart with plan for only grass or do engine
