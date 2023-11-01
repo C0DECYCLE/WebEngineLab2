@@ -34,6 +34,9 @@
 -   [x] gpu frustum culling
 -   [x] gpu timing
 -   [ ] https://math.hws.edu/graphicsbook/c9/s2.html
+-   [ ] indexed drawing
 
-//better wind via cull shader not vertex, optimize stuff into computes, better distribution
-//indexed drawing, write down all things from ghost of tsushima grass, optimize current, restart with plan for only grass or do engine, bézier curve
+//bézier curve and smooth normals generated in vertex shader?
+//write down all things from ghost of tsushima grass
+//optimize current?, stuff into computes
+//restart with plan for only grass or do engine

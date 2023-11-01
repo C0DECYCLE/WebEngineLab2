@@ -19,9 +19,9 @@ struct Instance {
 
 struct VertexShaderOut {
     @builtin(position) position: vec4f,
-    @location(0) worldPosition: vec3f,
-    @interpolate(flat) @location(1) flatWorldPosition: vec3f,
-    @location(2) selfHeight: f32,
+    @location(0) selfHeight: f32,
+    //@location(1) worldPosition: vec3f,
+    //@interpolate(flat) @location(2) flatWorldPosition: vec3f,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -37,6 +37,7 @@ struct VertexShaderOut {
 
     var position: vec3f = vertex.position;
     position.z += cos(position.y) - 1.0;
+    //position.z += position.y;
     position = (vec4f(position, 1.0) * instance.matrix).xyz;
     
     var windStrength: f32 = position.y * perlinNoise2(position.xz * 0.05 + uniforms.time * 0.001) * 0.35;
@@ -46,9 +47,9 @@ struct VertexShaderOut {
 
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1.0);
-    out.worldPosition = position;
-    out.flatWorldPosition = position;
     out.selfHeight = vertex.position.y;
+    //out.worldPosition = position;
+    //out.flatWorldPosition = position;
     return out;
 }
 

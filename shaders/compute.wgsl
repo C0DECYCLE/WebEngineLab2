@@ -24,7 +24,6 @@ const spread: f32 = 30.0;
         //col * 0.02 * spread - spread * 0.5
         noise(f32(instanceIndex) * 0.915 - 610.812) * spread - spread * 0.5
     );
-    //position.y = abs(perlinNoise2(position.xz * 0.05)) * 5.0;
     let radian: f32 = noise(f32(instanceIndex) * 0.712 + 918.782) * 6.3;
     let sc: f32 = abs(perlinNoise2(position.xz * 0.35)) * 2.0 + 1.0;
     let c: f32 = cos(radian);

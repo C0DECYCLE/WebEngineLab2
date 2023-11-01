@@ -204,8 +204,8 @@ const parser: OBJParser = new OBJParser();
 const data: OBJParseResult = parser.parse(raw, true);
 const vertexCount: int = data.indicies!.length;
 
-log(parser.parse(raw));
-log(parser.parse(raw, true));
+//log(parser.parse(raw));
+//log(parser.parse(raw, true));
 
 const vertexArrayBuffer: ArrayBuffer = data.positions.buffer;
 const verteciesBuffer: GPUBuffer = device.createBuffer({
