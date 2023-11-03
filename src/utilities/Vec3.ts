@@ -40,7 +40,7 @@ export class Vec3 {
         this.isDirty = true;
     }
 
-    public constructor(x: float = 0.0, y: float = 0.0, z: float = 0.0) {
+    public constructor(x: float = 0, y: float = 0, z: float = 0) {
         this.set(x, y, z);
     }
 

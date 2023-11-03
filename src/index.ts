@@ -135,7 +135,7 @@ const colorAttachment: GPURenderPassColorAttachment = {
     label: "color attachment",
     view: context!.getCurrentTexture().createView(), //viewTexture.createView(),
     //resolveTarget: context!.getCurrentTexture().createView(),
-    clearValue: [0.3, 0.3, 0.3, 1.0],
+    clearValue: [0.3, 0.3, 0.3, 1],
     loadOp: "clear",
     storeOp: "store", //"discard",
 } as GPURenderPassColorAttachment;
@@ -151,7 +151,7 @@ const depthTexture: GPUTexture = device.createTexture({
 const depthStencilAttachment: GPURenderPassDepthStencilAttachment = {
     label: "depth stencil attachment",
     view: depthTexture.createView(),
-    depthClearValue: 1.0,
+    depthClearValue: 1,
     depthLoadOp: "clear",
     depthStoreOp: "store", //"discard",
 } as GPURenderPassDepthStencilAttachment;
@@ -165,12 +165,12 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
 //////////// UNIFORM ////////////
 
 const byteSize: int = 4;
-const uniformBufferSize: int = 16 * byteSize + 1 * byteSize; /* + 1 * byteSize*/
+const uniformBufferSize: int = (4 * 4 + (1 + 3)) * byteSize;
 
 /*(4 * byteSize - (uniformBufferSize % (4 * byteSize)))*/
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
-    size: uniformBufferSize + 3 * byteSize,
+    size: uniformBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
@@ -229,16 +229,17 @@ log(dotit(vertexCount));
 //////////// INSTANCES ////////////
 
 const instanceCount: int = 10_000;
+const instanceByteLength: int = ((3 + 1) * 3 + (3 + 1)) * byteSize;
 
 const instancesBuffer: GPUBuffer = device.createBuffer({
     label: "instances storage buffer",
-    size: instanceCount * 4 * 4 * byteSize,
+    size: instanceCount * instanceByteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
 const cullBuffer: GPUBuffer = device.createBuffer({
     label: "cull storage buffer",
-    size: instanceCount * 4 * 4 * byteSize,
+    size: instanceCount * instanceByteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
@@ -374,13 +375,13 @@ const projection: Mat4 = Mat4.Perspective(
     60 * toRadian,
     canvas.width / canvas.height,
     0.01,
-    1000.0,
+    1000,
 );
 const viewProjection: Mat4 = new Mat4();
 
-const cameraPos: Vec3 = new Vec3(0.0, 6.0, 2.0);
-const cameraDir: Vec3 = new Vec3(0.0, 0.5, 1.0).normalize();
-const up: Vec3 = new Vec3(0.0, 1.0, 0.0);
+const cameraPos: Vec3 = new Vec3(0, 6, 2);
+const cameraDir: Vec3 = new Vec3(0, 0.5, 1).normalize();
+const up: Vec3 = new Vec3(0, 1, 0);
 
 //////////// CONTROL ////////////
 
@@ -437,19 +438,10 @@ async function render(now: float): Promise<void> {
     viewProjection
         .multiply(cameraView, projection)
         .store(floatValues, matrixOffset);
-    device!.queue.writeBuffer(
-        uniformBuffer,
-        matrixOffset * byteSize,
-        uniformArrayBuffer,
-        matrixOffset * byteSize,
-    );
+
     floatValues[timeOffset] = performance.now();
-    device!.queue.writeBuffer(
-        uniformBuffer,
-        timeOffset * byteSize,
-        uniformArrayBuffer,
-        timeOffset * byteSize,
-    );
+
+    device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
     //////////// CULL DRAW ////////////
 

@@ -4,53 +4,70 @@
  */
 
 struct Instance {
-    matrix: mat4x4f,
+    matrix: mat3x3f,
+    position: vec3f
 };
 
-const spread: f32 = 30.0;
+const spread: f32 = 30;
 
 @group(0) @binding(0) var<storage, read_write> instances: array<Instance>;
 
-@compute @workgroup_size(100, 1, 1) fn computeInstance(
-    @builtin(global_invocation_id) id: vec3<u32>
-) {
+@compute @workgroup_size(100, 1, 1) fn computeInstance(@builtin(global_invocation_id) id: vec3<u32>) {
     let instanceIndex: u32 = id.x;
-    let col: f32 = floor(f32(instanceIndex) / 100);
-    let row: f32 = f32(instanceIndex % 100);
-    var position: vec3f = vec3f(
+
+    //let col: f32 = floor(f32(instanceIndex) / 100);
+    //let row: f32 = f32(instanceIndex % 100);
+    let position: vec3f = vec3f(
         //row * 0.02 * spread - spread * 0.5,
         noise(f32(instanceIndex) * 0.456 + 213.534) * spread - spread * 0.5,
-        0.0,
+        0,
         //col * 0.02 * spread - spread * 0.5
         noise(f32(instanceIndex) * 0.915 - 610.812) * spread - spread * 0.5
     );
+        
     let radian: f32 = noise(f32(instanceIndex) * 0.712 + 918.782) * 6.3;
-    let sc: f32 = abs(perlinNoise2(position.xz * 0.35)) * 2.0 + 1.0;
+    let sc: f32 = abs(perlinNoise2(position.xz * 0.35)) * 2 + 1;
     let c: f32 = cos(radian);
     let s: f32 = sin(radian);
-    let matrix: mat4x4f = mat4x4f(
-         c * sc,      0, s * sc, position.x,
-              0, 1 * sc,      0, position.y,
-        -s * sc,      0, c * sc, position.z,
-              0,      0,      0,          1
+    let marix: mat3x3f = mat3x3f(
+         c * sc,   0, s * sc,
+              0,  sc,      0,
+        -s * sc,   0, c * sc
     );
-    instances[instanceIndex] = Instance(matrix);
+
+    instances[instanceIndex] = Instance(
+        marix, 
+        position,
+    );
 }
 
-fn rand(n: f32) -> f32 { return fract(sin(n) * 43758.5453123); }
-fn noise(p: f32) -> f32 { let fl = floor(p); return mix(rand(fl), rand(fl + 1.), fract(p)); }
-fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }
-fn fade2(t: vec2f) -> vec2f { return t * t * t * (t * (t * 6. - 15.) + 10.); }
+fn rand(n: f32) -> f32 { 
+    return fract(sin(n) * 43758.5453123); 
+}
+
+fn noise(p: f32) -> f32 { 
+    let fl = floor(p); 
+    return mix(rand(fl), rand(fl + 1), fract(p)); 
+}
+
+fn permute4(x: vec4f) -> vec4f { 
+    return ((x * 34 + 1) * x) % vec4f(289.); 
+}
+
+fn fade2(t: vec2f) -> vec2f { 
+    return t * t * t * (t * (t * 6 - 15) + 10); 
+}
+
 fn perlinNoise2(P: vec2f) -> f32 {
-    var Pi: vec4f = floor(P.xyxy) + vec4f(0., 0., 1., 1.);
-    let Pf = fract(P.xyxy) - vec4f(0., 0., 1., 1.);
-    Pi = Pi % vec4f(289.); // To avoid truncation effects in permutation
+    var Pi: vec4f = floor(P.xyxy) + vec4f(0, 0, 1, 1);
+    let Pf = fract(P.xyxy) - vec4f(0, 0, 1, 1);
+    Pi = Pi % vec4f(289); // To avoid truncation effects in permutation
     let ix = Pi.xzxz;
     let iy = Pi.yyww;
     let fx = Pf.xzxz;
     let fy = Pf.yyww;
     let i = permute4(permute4(ix) + iy);
-    var gx: vec4f = 2. * fract(i * 0.0243902439) - 1.; // 1/41 = 0.024...
+    var gx: vec4f = 2 * fract(i * 0.0243902439) - 1; // 1/41 = 0.024...
     let gy = abs(gx) - 0.5;
     let tx = floor(gx + 0.5);
     gx = gx - tx;

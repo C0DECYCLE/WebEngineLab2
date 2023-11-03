@@ -5,15 +5,15 @@
 
 import { int, float, uuid } from "../../types/utilities/utils.type.js";
 
-export const PHI: float = (1.0 + 5.0 ** 0.5) / 2.0;
+export const PHI: float = (1 + 5 ** 0.5) / 2;
 
 export const toAngle: float = 180 / Math.PI;
 export const toRadian: float = Math.PI / 180;
 
 export function normalizeRadian(value: float): float {
-    value = value % (2.0 * Math.PI);
+    value = value % (2 * Math.PI);
     if (value < 0) {
-        value += 2.0 * Math.PI;
+        value += 2 * Math.PI;
     }
     return value;
 }

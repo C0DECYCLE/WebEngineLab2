@@ -59,7 +59,7 @@ export class OBJParser {
         if (!indexed) {
             return;
         }
-        this.positionCache.push(x, y, z, 0.0);
+        this.positionCache.push(x, y, z, 0);
     }
 
     private keywordF(parts: string[], indexed: boolean): void {
@@ -67,9 +67,9 @@ export class OBJParser {
         const b: int = parseInt(parts[1]) - 1;
         const c: int = parseInt(parts[2]) - 1;
         if (!indexed) {
-            this.positionCache.push(...this.vertexCache[a].slice(0, 3), 0.0);
-            this.positionCache.push(...this.vertexCache[b].slice(0, 3), 0.0);
-            this.positionCache.push(...this.vertexCache[c].slice(0, 3), 0.0);
+            this.positionCache.push(...this.vertexCache[a].slice(0, 3), 0);
+            this.positionCache.push(...this.vertexCache[b].slice(0, 3), 0);
+            this.positionCache.push(...this.vertexCache[c].slice(0, 3), 0);
             return;
         }
         this.indexCache.push(a, b, c);

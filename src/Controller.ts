@@ -19,9 +19,9 @@ export class Controller {
     private readonly activeKeys: MapString<boolean> = new MapString<boolean>();
 
     private direction: Vec3 = new Vec3();
+    private readonly globalUp: Vec3 = new Vec3(0, 1, 0);
     private left: Vec3 = new Vec3();
-    private readonly globalUp: Vec3 = new Vec3(0.0, 1.0, 0.0);
-    private localUp: Vec3 = new Vec3(0.0, 1.0, 0.0);
+    private localUp: Vec3 = new Vec3();
 
     private readonly camera: CameraRequirements;
     private transform: Mat4 = new Mat4();
@@ -111,7 +111,7 @@ export class Controller {
     }
 
     private updatePosition(): void {
-        this.direction.set(0.0, 0.0, 0.0);
+        this.direction.set(0, 0, 0);
         this.left.copy(this.camera.direction).cross(this.globalUp);
         this.localUp.copy(this.left).cross(this.camera.direction);
         if (this.activeKeys.get("w") === true) {
@@ -154,5 +154,5 @@ export class Controller {
 
     private static readonly MinVelocity: float = 0.01;
     private static readonly DefaultVelocity: float = 0.35;
-    private static readonly MaxVelocity: float = 1.0;
+    private static readonly MaxVelocity: float = 1;
 }
