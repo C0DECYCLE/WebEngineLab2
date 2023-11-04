@@ -48,52 +48,102 @@ context.configure({
     format: presentationFormat,
 } as GPUCanvasConfiguration);
 
+//const sampleCount: int = 4;
+
 //////////// SHADER ////////////
 
-const renderShader: GPUShaderModule = device.createShaderModule({
+const computeModule: GPUShaderModule = device.createShaderModule({
+    label: "compute shader",
+    code: await fetch("./shaders/grass-compute.wgsl").then(
+        async (response: Response) => await response.text(),
+    ),
+} as GPUShaderModuleDescriptor);
+
+const cullModule: GPUShaderModule = device.createShaderModule({
+    label: "cull shader",
+    code: await fetch("./shaders/grass-cull.wgsl").then(
+        async (response: Response) => await response.text(),
+    ),
+} as GPUShaderModuleDescriptor);
+
+const renderModule: GPUShaderModule = device.createShaderModule({
     label: "render shader",
-    code: await fetch("./shaders/render.wgsl").then(
+    code: await fetch("./shaders/grass-render.wgsl").then(
         async (response: Response) => await response.text(),
     ),
 } as GPUShaderModuleDescriptor);
 
 //////////// PIPELINE ////////////
 
+const computePipeline: GPUComputePipeline = device.createComputePipeline({
+    label: "compute pipeline",
+    layout: "auto",
+    compute: {
+        module: computeModule,
+        entryPoint: "computeInstance",
+    } as GPUProgrammableStage,
+} as GPUComputePipelineDescriptor);
+
+const cullPipeline: GPUComputePipeline = device.createComputePipeline({
+    label: "cull pipeline",
+    layout: "auto",
+    compute: {
+        module: cullModule,
+        entryPoint: "cullInstance",
+    } as GPUProgrammableStage,
+} as GPUComputePipelineDescriptor);
+
 const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
     label: "render pipeline",
     layout: "auto",
     vertex: {
-        module: renderShader,
+        module: renderModule,
         entryPoint: "vs",
     } as GPUVertexState,
     fragment: {
-        module: renderShader,
+        module: renderModule,
         entryPoint: "fs",
         targets: [{ format: presentationFormat }],
     } as GPUFragmentState,
     primitive: {
-        cullMode: "back",
+        //cullMode: "back",
     } as GPUPrimitiveState,
     depthStencil: {
         depthWriteEnabled: true,
         depthCompare: "less",
         format: "depth24plus",
     } as GPUDepthStencilState,
+    /*
+    multisample: {
+        count: sampleCount,
+    } as GPUMultisampleState,
+    */
 } as GPURenderPipelineDescriptor);
 
 //////////// RENDERPASS ////////////
+/*
+const viewTexture: GPUTexture = device.createTexture({
+    label: "view texture",
+    size: [canvas.width, canvas.height],
+    sampleCount: sampleCount,
+    format: presentationFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+} as GPUTextureDescriptor);
+*/
 
 const colorAttachment: GPURenderPassColorAttachment = {
     label: "color attachment",
-    view: context!.getCurrentTexture().createView(),
+    view: context!.getCurrentTexture().createView(), //viewTexture.createView(),
+    //resolveTarget: context!.getCurrentTexture().createView(),
     clearValue: [0.3, 0.3, 0.3, 1],
     loadOp: "clear",
-    storeOp: "store",
+    storeOp: "store", //"discard",
 } as GPURenderPassColorAttachment;
 
 const depthTexture: GPUTexture = device.createTexture({
     label: "depth texture",
     size: [canvas.width, canvas.height],
+    //sampleCount: sampleCount,
     format: "depth24plus",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
 } as GPUTextureDescriptor);
@@ -103,7 +153,7 @@ const depthStencilAttachment: GPURenderPassDepthStencilAttachment = {
     view: depthTexture.createView(),
     depthClearValue: 1,
     depthLoadOp: "clear",
-    depthStoreOp: "store",
+    depthStoreOp: "store", //"discard",
 } as GPURenderPassDepthStencilAttachment;
 
 const renderPassDescriptor: GPURenderPassDescriptor = {
@@ -115,37 +165,54 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
 //////////// UNIFORM ////////////
 
 const byteSize: int = 4;
+const uniformBufferSize: int = (4 * 4 + (1 + 3)) * byteSize;
 
-const uniformFloats: int = 4 * 4;
-const uniformData: Float32Array = new Float32Array(uniformFloats);
-
-const uniformArrayBuffer: ArrayBuffer = uniformData.buffer;
+/*(4 * byteSize - (uniformBufferSize % (4 * byteSize)))*/
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
-    size: uniformArrayBuffer.byteLength,
+    size: uniformBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
+const uniformArrayBuffer: ArrayBuffer = new ArrayBuffer(uniformBufferSize);
+const floatValues: Float32Array = new Float32Array(uniformArrayBuffer);
+//const intValues: Uint32Array = new Uint32Array(uniformArrayBuffer);
 
-//////////// VERTECIES INDICES ////////////
+const matrixOffset: int = 0;
+const timeOffset: int = 16;
+//const modeOffset: int = 17;
 
-const raw: string = await fetch("./resources/cube.obj").then(
+/*
+(window as any).setMode = (mode: 0 | 1 | 2) => {
+    intValues[modeOffset] = mode;
+    device!.queue.writeBuffer(
+        uniformBuffer,
+        modeOffset * byteSize,
+        uniformArrayBuffer,
+        modeOffset * byteSize,
+    );
+};
+(window as any).setMode(2);
+*/
+
+//////////// VERTECIES ////////////
+
+const raw: string = await fetch("./resources/grass.obj").then(
     async (response: Response) => await response.text(),
 );
 const parser: OBJParser = new OBJParser();
 const data: OBJParseResult = parser.parse(raw, true);
-const verteciesCount: int = data.positions.length / 4;
-const indicesCount: int = data.indicies!.length;
+const vertexCount: int = data.indicies!.length;
+
+//log(parser.parse(raw));
+//log(parser.parse(raw, true));
 
 const vertexArrayBuffer: ArrayBuffer = data.positions.buffer;
 const verteciesBuffer: GPUBuffer = device.createBuffer({
-    label: "vertex buffer",
+    label: "vertices storage buffer",
     size: vertexArrayBuffer.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-
-device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
 
 const indexArrayBuffer: ArrayBuffer = data.indicies!.buffer;
 const indicesBuffer: GPUBuffer = device.createBuffer({
@@ -155,36 +222,34 @@ const indicesBuffer: GPUBuffer = device.createBuffer({
 } as GPUBufferDescriptor);
 
 device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
+device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
 
-log("vertecies", dotit(verteciesCount));
-log("indices", dotit(indicesCount));
+log(dotit(vertexCount));
 
 //////////// INSTANCES ////////////
 
-const instanceCount: int = 1;
-const instanceFloats: int = 3 + 1;
-const instancesData: Float32Array = new Float32Array(
-    instanceCount * instanceFloats,
-);
+const instanceCount: int = 10_000;
+const instanceByteLength: int = ((3 + 1) * 3 + (3 + 1)) * byteSize;
 
-new Vec3(0, 0, 0).store(instancesData, 0 * instanceFloats);
-
-const instancesArrayBuffer: ArrayBuffer = instancesData.buffer;
 const instancesBuffer: GPUBuffer = device.createBuffer({
-    label: "instances buffer",
-    size: instancesArrayBuffer.byteLength,
+    label: "instances storage buffer",
+    size: instanceCount * instanceByteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-device.queue.writeBuffer(instancesBuffer, 0, instancesArrayBuffer);
+const cullBuffer: GPUBuffer = device.createBuffer({
+    label: "cull storage buffer",
+    size: instanceCount * instanceByteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
 
-log("instances", dotit(instanceCount));
+log(dotit(instanceCount));
 
 //////////// INDIRECT ////////////
 
 const indirectData: Uint32Array = new Uint32Array([
-    indicesCount, //aka indexCount
-    instanceCount, //instanceCount,
+    vertexCount, //aka indexCount
+    0, //instanceCount,
     0,
     0,
     0,
@@ -203,14 +268,14 @@ const indirectBuffer: GPUBuffer = device.createBuffer({
 
 device.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
 
-const indirectReadbackBuffer: GPUBuffer = device.createBuffer({
+const readbackBuffer: GPUBuffer = device.createBuffer({
     size: indirectBuffer.size,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
 
 //////////// GPU TIMING ////////////
 
-const capacity: int = 2;
+const capacity: int = 3;
 
 const querySet: GPUQuerySet = device.createQuerySet({
     type: "timestamp",
@@ -233,6 +298,40 @@ const queryReadbackBuffer: GPUBuffer = device.createBuffer({
 
 //////////// BINDGROUP ////////////
 
+const computeBindGroup: GPUBindGroup = device.createBindGroup({
+    label: "compute bind group",
+    layout: computePipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: { buffer: instancesBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+    ],
+} as GPUBindGroupDescriptor);
+
+const cullBindGroup: GPUBindGroup = device.createBindGroup({
+    label: "cull bind group",
+    layout: cullPipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: { buffer: instancesBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 1,
+            resource: { buffer: indirectBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 2,
+            resource: { buffer: cullBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 3,
+            resource: { buffer: uniformBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+    ],
+} as GPUBindGroupDescriptor);
+
 const renderBindGroup: GPUBindGroup = device.createBindGroup({
     label: "render bind group",
     layout: renderPipeline.getBindGroupLayout(0),
@@ -247,10 +346,27 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
         } as GPUBindGroupEntry,
         {
             binding: 2,
-            resource: { buffer: instancesBuffer } as GPUBindingResource,
+            resource: { buffer: cullBuffer } as GPUBindingResource,
         } as GPUBindGroupEntry,
     ],
 } as GPUBindGroupDescriptor);
+
+//////////// COMPUTE ////////////
+
+const computeEncoder: GPUCommandEncoder = device!.createCommandEncoder({
+    label: "compute command encoder",
+} as GPUObjectDescriptorBase);
+
+const computePass: GPUComputePassEncoder = computeEncoder.beginComputePass({
+    label: "compute pass",
+} as GPUComputePassDescriptor);
+computePass.setPipeline(computePipeline);
+computePass.setBindGroup(0, computeBindGroup);
+computePass.dispatchWorkgroups(instanceCount / 100, 1, 1);
+computePass.end();
+
+const computeCommandBuffer: GPUCommandBuffer = computeEncoder.finish();
+device!.queue.submit([computeCommandBuffer]);
 
 //////////// MATRIX ////////////
 
@@ -263,7 +379,7 @@ const projection: Mat4 = Mat4.Perspective(
 );
 const viewProjection: Mat4 = new Mat4();
 
-const cameraPos: Vec3 = new Vec3(0, 1, 2);
+const cameraPos: Vec3 = new Vec3(0, 6, 2);
 const cameraDir: Vec3 = new Vec3(0, 0.5, 1).normalize();
 const up: Vec3 = new Vec3(0, 1, 0);
 
@@ -279,24 +395,36 @@ const control: Controller = new Controller(canvas, {
 const stats: Stats = new Stats();
 stats.set("frame delta", 0);
 stats.set("gpu delta", 0);
+stats.set("cull delta", 0);
 stats.set("render delta", 0);
-stats.set("instances", 0);
+stats.set("cull", 0);
 stats.show();
 
 //////////// RENDER BUNDLE ////////////
+
+function draw(
+    renderEncoder: GPURenderPassEncoder | GPURenderBundleEncoder,
+): void {
+    renderEncoder.setPipeline(renderPipeline);
+    renderEncoder.setBindGroup(0, renderBindGroup);
+    renderEncoder.setIndexBuffer(indicesBuffer, "uint32");
+    renderEncoder.drawIndexedIndirect(indirectBuffer, 0);
+    /*
+    for (let i: int = 0; i < instanceCount; i++) {
+        //out of date! now indexed!
+        renderEncoder.draw(vertexCount, 1, 0, i);
+    }
+    */
+}
 
 const renderBundleEncoder: GPURenderBundleEncoder =
     device.createRenderBundleEncoder({
         label: "render bundle",
         colorFormats: [presentationFormat],
+        //sampleCount: sampleCount,
         depthStencilFormat: "depth24plus",
     } as GPURenderBundleEncoderDescriptor);
-
-renderBundleEncoder.setPipeline(renderPipeline);
-renderBundleEncoder.setBindGroup(0, renderBindGroup);
-renderBundleEncoder.setIndexBuffer(indicesBuffer, "uint32");
-renderBundleEncoder.drawIndexedIndirect(indirectBuffer, 0);
-
+draw(renderBundleEncoder);
 const renderBundle: GPURenderBundle = renderBundleEncoder.finish();
 
 async function render(now: float): Promise<void> {
@@ -307,13 +435,18 @@ async function render(now: float): Promise<void> {
     control.update();
 
     cameraView.view(cameraPos, cameraDir, up);
-    viewProjection.multiply(cameraView, projection).store(uniformData, 0);
+    viewProjection
+        .multiply(cameraView, projection)
+        .store(floatValues, matrixOffset);
+
+    floatValues[timeOffset] = performance.now();
 
     device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
-    //////////// RENDER ////////////
+    //////////// CULL DRAW ////////////
 
     colorAttachment.view = context!.getCurrentTexture().createView();
+    //colorAttachment.resolveTarget = context!.getCurrentTexture().createView();
     depthStencilAttachment.view = depthTexture.createView();
 
     device!.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
@@ -324,20 +457,35 @@ async function render(now: float): Promise<void> {
 
     renderEncoder.writeTimestamp(querySet, 0);
 
-    const renderPass: GPURenderPassEncoder =
-        renderEncoder.beginRenderPass(renderPassDescriptor);
-    renderPass.executeBundles([renderBundle]);
-    renderPass.end();
+    const cullPass: GPUComputePassEncoder = renderEncoder.beginComputePass({
+        label: "cull pass",
+    } as GPUComputePassDescriptor);
+    cullPass.setPipeline(cullPipeline);
+    cullPass.setBindGroup(0, cullBindGroup);
+    cullPass.dispatchWorkgroups(instanceCount / 100, 1, 1);
+    cullPass.end();
 
     renderEncoder.writeTimestamp(querySet, 1);
 
-    if (indirectReadbackBuffer.mapState === "unmapped") {
+    const renderPass: GPURenderPassEncoder =
+        renderEncoder.beginRenderPass(renderPassDescriptor);
+    const useRenderBundles: boolean = true;
+    if (useRenderBundles) {
+        renderPass.executeBundles([renderBundle]);
+    } else {
+        draw(renderPass);
+    }
+    renderPass.end();
+
+    renderEncoder.writeTimestamp(querySet, 2);
+
+    if (readbackBuffer.mapState === "unmapped") {
         renderEncoder.copyBufferToBuffer(
             indirectBuffer,
             0,
-            indirectReadbackBuffer,
+            readbackBuffer,
             0,
-            indirectReadbackBuffer.size,
+            readbackBuffer.size,
         );
     }
 
@@ -356,13 +504,14 @@ async function render(now: float): Promise<void> {
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
     device!.queue.submit([renderCommandBuffer]);
 
-    if (indirectReadbackBuffer.mapState === "unmapped") {
-        indirectReadbackBuffer.mapAsync(GPUMapMode.READ).then(() => {
+    if (readbackBuffer.mapState === "unmapped") {
+        readbackBuffer.mapAsync(GPUMapMode.READ).then(() => {
             const result: Uint32Array = new Uint32Array(
-                indirectReadbackBuffer.getMappedRange().slice(0),
+                readbackBuffer.getMappedRange().slice(0),
             );
-            indirectReadbackBuffer.unmap();
-            stats.set("instances", result[1]);
+            readbackBuffer.unmap();
+            //log(dotit(result[1]));
+            stats.set("cull", result[1]);
         });
     }
 
@@ -373,13 +522,18 @@ async function render(now: float): Promise<void> {
             );
             queryReadbackBuffer.unmap();
             stats.set(
-                "render delta",
+                "cull delta",
                 Number(timingsNanoseconds[1] - timingsNanoseconds[0]) /
                     1_000_000,
             );
             stats.set(
+                "render delta",
+                Number(timingsNanoseconds[2] - timingsNanoseconds[1]) /
+                    1_000_000,
+            );
+            stats.set(
                 "gpu delta",
-                Number(timingsNanoseconds[1] - timingsNanoseconds[0]) /
+                Number(timingsNanoseconds[2] - timingsNanoseconds[0]) /
                     1_000_000,
             );
         });
@@ -405,9 +559,10 @@ async function render(now: float): Promise<void> {
                 1,
             )} fps</b><br>
             gpu delta: ${stats.get("gpu delta")!.toFixed(2)} ms<br>
+            |- cull delta: ${stats.get("cull delta")!.toFixed(2)} ms<br>
             |- render delta: ${stats.get("render delta")!.toFixed(2)} ms<br>
             <br>
-            instances: ${stats.get("instances")}
+            unculled: ${stats.get("cull")}
     `);
     stats.set("frame delta", now);
 
