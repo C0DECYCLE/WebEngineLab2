@@ -94,7 +94,7 @@ export class Controller {
             if (!this.isLocked) {
                 return;
             }
-            this.velocity -= event.deltaY * 0.0001;
+            this.velocity -= event.deltaY * 0.01;
             this.velocity = clamp(
                 this.velocity,
                 Controller.MinVelocity,
@@ -154,5 +154,5 @@ export class Controller {
 
     private static readonly MinVelocity: float = 0.01;
     private static readonly DefaultVelocity: float = 0.35;
-    private static readonly MaxVelocity: float = 1;
+    private static readonly MaxVelocity: float = 5;
 }

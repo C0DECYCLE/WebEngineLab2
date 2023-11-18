@@ -74,3 +74,9 @@ export function clear<T>(value: T[]): T[] {
     value.length = 0;
     return value;
 }
+
+export function assert(condition: any, msg?: string): asserts condition {
+    if (!condition) {
+        throw new Error(msg);
+    }
+}
