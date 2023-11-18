@@ -1,4 +1,6 @@
-# SpaceEngine
+# 🪶 WebEngine Lab 2
+
+> Experimental lab 2 for the lightweight fast graphics engine for the web.
 
 -   [x] dependency injection, import or provider?
 -   [ ] clean code robert c martin

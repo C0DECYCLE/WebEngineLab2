@@ -7,8 +7,8 @@
         "build-win32": "cls && npx tsc",
         "test-macos": "clear && node --experimental-vm-modules node_modules/.bin/jest",
         "test-win32": "cls && node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
-        "browser-macos": "clear && open -a 'Google Chrome Canary' http://127.0.0.1:5500/ --args --enable-dawn-features=allow_unsafe_apis",
-        "browser-win32": "cls && start chrome http://127.0.0.1:5500/ --args --enable-dawn-features=allow_unsafe_apis"
+        "browser-macos": "clear && open -a 'Google Chrome Canary' http://127.0.0.1:5500/",
+        "browser-win32": "cls && start chrome http://127.0.0.1:5500/"
     },
     "repository": {
         "type": "git",

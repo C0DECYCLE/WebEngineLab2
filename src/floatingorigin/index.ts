@@ -8,14 +8,15 @@ import {
     float,
     Nullable,
     Undefinable,
-} from "../types/utilities/utils.type.js";
-import { toRadian, dotit } from "./utilities/utils.js";
-import { log } from "./utilities/logger.js";
-import { Vec3 } from "./utilities/Vec3.js";
-import { Mat4 } from "./utilities/Mat4.js";
-import { Controller } from "./Controller.js";
-import { OBJParseResult, OBJParser } from "./OBJParser.js";
-import { Stats } from "./Stats.js";
+} from "../../types/utilities/utils.type.js";
+import { toRadian, dotit } from "../utilities/utils.js";
+import { log } from "../utilities/logger.js";
+import { Vec3 } from "../utilities/Vec3.js";
+import { Mat4 } from "../utilities/Mat4.js";
+import { Controller } from "../Controller.js";
+import { OBJParseResult, OBJParser } from "../OBJParser.js";
+import { Stats } from "../Stats.js";
+import { RollingAverage } from "../RollingAverage.js";
 
 function createCanvas(): HTMLCanvasElement {
     const canvas: HTMLCanvasElement = document.createElement("canvas");
@@ -52,10 +53,37 @@ context.configure({
 
 const renderShader: GPUShaderModule = device.createShaderModule({
     label: "render shader",
-    code: await fetch("./shaders/render.wgsl").then(
+    code: await fetch("./shaders/floatingorigin/render.wgsl").then(
         async (response: Response) => await response.text(),
     ),
 } as GPUShaderModuleDescriptor);
+
+//////////// CONSTS ////////////
+
+const byteSize: int = 4;
+
+//////////// GPU TIMING ////////////
+
+const capacity: int = 2;
+
+const querySet: GPUQuerySet = device.createQuerySet({
+    type: "timestamp",
+    count: capacity,
+} as GPUQuerySetDescriptor);
+
+const queryBuffer: GPUBuffer = device.createBuffer({
+    size: capacity * (byteSize * 2), //64bit
+    usage:
+        GPUBufferUsage.QUERY_RESOLVE |
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_SRC |
+        GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+
+const queryReadbackBuffer: GPUBuffer = device.createBuffer({
+    size: queryBuffer.size,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+});
 
 //////////// PIPELINE ////////////
 
@@ -110,11 +138,14 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
     label: "render pass",
     colorAttachments: [colorAttachment],
     depthStencilAttachment: depthStencilAttachment,
+    timestampWrites: {
+        querySet: querySet,
+        beginningOfPassWriteIndex: 0,
+        endOfPassWriteIndex: 1,
+    } as GPURenderPassTimestampWrites,
 } as GPURenderPassDescriptor;
 
 //////////// UNIFORM ////////////
-
-const byteSize: int = 4;
 
 const uniformFloats: int = 4 * 4;
 const uniformData: Float32Array = new Float32Array(uniformFloats);
@@ -208,29 +239,6 @@ const indirectReadbackBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
 
-//////////// GPU TIMING ////////////
-
-const capacity: int = 2;
-
-const querySet: GPUQuerySet = device.createQuerySet({
-    type: "timestamp",
-    count: capacity,
-} as GPUQuerySetDescriptor);
-
-const queryBuffer: GPUBuffer = device.createBuffer({
-    size: capacity * (byteSize * 2), //64bit
-    usage:
-        GPUBufferUsage.QUERY_RESOLVE |
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-} as GPUBufferDescriptor);
-
-const queryReadbackBuffer: GPUBuffer = device.createBuffer({
-    size: queryBuffer.size,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-});
-
 //////////// BINDGROUP ////////////
 
 const renderBindGroup: GPUBindGroup = device.createBindGroup({
@@ -283,6 +291,11 @@ stats.set("render delta", 0);
 stats.set("instances", 0);
 stats.show();
 
+const frameDelta: RollingAverage = new RollingAverage(60);
+const cpuDelta: RollingAverage = new RollingAverage(60);
+const gpuDelta: RollingAverage = new RollingAverage(60);
+const renderDelta: RollingAverage = new RollingAverage(60);
+
 //////////// RENDER BUNDLE ////////////
 
 const renderBundleEncoder: GPURenderBundleEncoder =
@@ -322,14 +335,10 @@ async function render(now: float): Promise<void> {
         label: "render command encoder",
     } as GPUObjectDescriptorBase);
 
-    renderEncoder.writeTimestamp(querySet, 0);
-
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
     renderPass.executeBundles([renderBundle]);
     renderPass.end();
-
-    renderEncoder.writeTimestamp(querySet, 1);
 
     if (indirectReadbackBuffer.mapState === "unmapped") {
         renderEncoder.copyBufferToBuffer(
@@ -373,41 +382,39 @@ async function render(now: float): Promise<void> {
             );
             queryReadbackBuffer.unmap();
             stats.set(
-                "render delta",
-                Number(timingsNanoseconds[1] - timingsNanoseconds[0]) /
-                    1_000_000,
-            );
-            stats.set(
                 "gpu delta",
                 Number(timingsNanoseconds[1] - timingsNanoseconds[0]) /
                     1_000_000,
             );
+            gpuDelta.sample(stats.get("gpu delta")!);
+            stats.set(
+                "render delta",
+                Number(timingsNanoseconds[1] - timingsNanoseconds[0]) /
+                    1_000_000,
+            );
+            renderDelta.sample(stats.get("render delta")!);
         });
     }
 
     //////////// FRAME ////////////
 
     stats.set("frame delta", now - stats.get("frame delta")!);
+    frameDelta.sample(stats.get("frame delta")!);
     stats.time("cpu delta", "cpu delta");
+    cpuDelta.sample(stats.get("cpu delta")!);
     // prettier-ignore
     stats.update(`
-            <b>frame rate: ${(1_000 / stats.get("frame delta")!).toFixed(
-                1,
-            )} fps</b><br>
-            frame delta: ${stats.get("frame delta")!.toFixed(2)} ms<br>
-            <br>
-            <b>cpu rate: ${(1_000 / stats.get("cpu delta")!).toFixed(
-                1,
-            )} fps</b><br>
-            cpu delta: ${stats.get("cpu delta")!.toFixed(2)} ms<br>
-            <br>
-            <b>gpu rate: ${(1_000 / stats.get("gpu delta")!).toFixed(
-                1,
-            )} fps</b><br>
-            gpu delta: ${stats.get("gpu delta")!.toFixed(2)} ms<br>
-            |- render delta: ${stats.get("render delta")!.toFixed(2)} ms<br>
-            <br>
-            instances: ${stats.get("instances")}
+        <b>frame rate: ${(1_000 / frameDelta.get()).toFixed(0)} fps</b><br>
+        frame delta: ${frameDelta.get().toFixed(2)} ms<br>
+        <br>
+        <b>cpu rate: ${(1_000 / cpuDelta.get()).toFixed(0)} fps</b><br>
+        cpu delta: ${cpuDelta.get().toFixed(2)} ms<br>
+        <br>
+        <b>gpu rate: ${(1_000 / gpuDelta.get()).toFixed(0)} fps</b><br>
+        gpu delta: ${gpuDelta.get().toFixed(2)} ms<br>
+        |- render delta: ${renderDelta.get().toFixed(2)} ms<br>
+        <br>
+        instances: ${stats.get("instances")}
     `);
     stats.set("frame delta", now);
 
