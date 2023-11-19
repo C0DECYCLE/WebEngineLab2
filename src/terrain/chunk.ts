@@ -37,12 +37,12 @@ function generateGeometry(resolution: int): ChunkGeometryData {
     };
 }
 
-export const ChunkResolution: int = 32;
+export const ChunkResolution: int = 64;
 
 export const ChunkGeometry: ChunkGeometryData =
     generateGeometry(ChunkResolution);
 
-export const ChunkMinSize: float = 32;
+export const ChunkMinSize: float = 16;
 
 export type ChunkData = {
     position: Vec3;

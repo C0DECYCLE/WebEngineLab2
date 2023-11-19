@@ -90,6 +90,40 @@ const queryReadbackBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
 
+//////////// TEXTURE ////////////
+
+async function loadImageBitmap(url: string): Promise<ImageBitmap> {
+    const res: Response = await fetch(url);
+    const blob: Blob = await res.blob();
+    return await createImageBitmap(blob, { colorSpaceConversion: "none" });
+}
+
+const url: string = "./resources/heightmap-toussaint-small.png";
+const source: ImageBitmap = await loadImageBitmap(url);
+const texture: GPUTexture = device.createTexture({
+    label: "heightmap texture",
+    format: "rgba8unorm",
+    size: [source.width, source.height],
+    usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+} as GPUTextureDescriptor);
+
+device.queue.copyExternalImageToTexture(
+    {
+        source: source,
+        /*flipY: true*/
+    } as GPUImageCopyExternalImage,
+    {
+        texture: texture,
+    } as GPUImageCopyTextureTagged,
+    {
+        width: source.width,
+        height: source.height,
+    } as GPUExtent3DStrict,
+);
+
 //////////// PIPELINE ////////////
 
 const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
@@ -307,6 +341,10 @@ async function render(now: float): Promise<void> {
             {
                 binding: 2,
                 resource: { buffer: instancesBuffer } as GPUBindingResource,
+            } as GPUBindGroupEntry,
+            {
+                binding: 3,
+                resource: texture.createView(),
             } as GPUBindGroupEntry,
         ],
     } as GPUBindGroupDescriptor);
