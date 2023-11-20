@@ -36,14 +36,16 @@
 -   [x] gpu timing
 -   [x] https://math.hws.edu/graphicsbook/c9/s2.html
 -   [x] indexed drawing
--   [x] bézier curve and smooth normals generated in vertex shader?
-
-//write down all things from ghost of tsushima grass
-//restart with plan for only grass or do engine
+-   [x] bézier curve and smooth normals generated in vertex
 
 //miniature 3d stylized witcher like rpg procedural prototype
 //depth of field, advanced lighting (deferred?, global illumination)
 //fog, procedural terrain, procedural folliage vegetation grass
 //monsters, main character, loot, witcher like
-//webgpu, prototype, low poly? smooth shading?
+//webgpu, prototype, low poyl? flat smooth or toon shading? normals?
 //procedural towns buildings
+//inspiration
+
+//frustum cull compute
+//just basic flat terrain, color it
+//spawn vetegetation
