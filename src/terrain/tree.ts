@@ -3,8 +3,9 @@
  * Written by Noah Mattia Bussinger, October 2023
  */
 
-import { int, float } from "../../types/utilities/utils.type.js";
+import { int, float } from "../utilities/utils.type.js";
 import { Vec3 } from "../utilities/Vec3.js";
+import { warn } from "../utilities/logger.js";
 import {
     ChunkData,
     ChunkInstanceLength,
@@ -31,12 +32,15 @@ export function generateTree(origin: Vec3, size: float, point: Vec3): TreeData {
     return [{ position: origin, size: size } as ChunkData];
 }
 
-export function treeToInstances(tree: TreeData): Float32Array {
-    const instances: Float32Array = new Float32Array(
-        tree.length * ChunkInstanceLength,
-    );
-    for (let i: int = 0; i < tree.length; i++) {
+export const MaxTreeLength: int = 40;
+
+export function storeTree(instances: Float32Array, tree: TreeData): int {
+    if (tree.length > MaxTreeLength) {
+        warn(`Ran out of tree length. (${tree.length} -> ${MaxTreeLength})`);
+    }
+    const length: int = Math.min(tree.length, MaxTreeLength);
+    for (let i: int = 0; i < length; i++) {
         storeChunk(instances, i * ChunkInstanceLength, tree[i]);
     }
-    return instances;
+    return length;
 }

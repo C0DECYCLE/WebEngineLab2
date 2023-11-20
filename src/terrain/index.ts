@@ -3,13 +3,8 @@
  * Written by Noah Mattia Bussinger, October 2023
  */
 
-import {
-    int,
-    float,
-    Nullable,
-    Undefinable,
-} from "../../types/utilities/utils.type.js";
-import { toRadian, dotit, assert } from "../utilities/utils.js";
+import { int, float } from "../../types/utilities/utils.type.js";
+import { toRadian, dotit } from "../utilities/utils.js";
 import { log } from "../utilities/logger.js";
 import { Vec3 } from "../utilities/Vec3.js";
 import { Mat4 } from "../utilities/Mat4.js";
@@ -22,50 +17,23 @@ import {
     ChunkGeometry,
     ChunkInstanceLength,
 } from "./chunk.js";
-import { TreeData, generateTree, treeToInstances } from "./quadtree.js";
-
-function createCanvas(): HTMLCanvasElement {
-    const canvas: HTMLCanvasElement = document.createElement("canvas");
-    canvas.width = document.body.clientWidth * devicePixelRatio;
-    canvas.height = document.body.clientHeight * devicePixelRatio;
-    canvas.style.position = "absolute";
-    canvas.style.top = "0px";
-    canvas.style.left = "0px";
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    document.body.appendChild(canvas);
-    return canvas;
-}
+import { MaxTreeLength, TreeData, generateTree, storeTree } from "./tree.js";
+import { byteSize, createGPU, loadShader } from "./helper.js";
+import { createTerrainShader } from "./terrain.js";
 
 //////////// SETUP ////////////
 
-const canvas: HTMLCanvasElement = createCanvas();
-const adapter: Nullable<GPUAdapter> = await navigator.gpu?.requestAdapter();
-const device: Undefinable<GPUDevice> = await adapter?.requestDevice({
-    requiredFeatures: ["timestamp-query"],
-} as GPUDeviceDescriptor);
-assert(device);
-const context: Nullable<GPUCanvasContext> = canvas.getContext("webgpu");
-assert(context);
-const presentationFormat: GPUTextureFormat =
-    navigator.gpu.getPreferredCanvasFormat();
-context.configure({
-    device: device,
-    format: presentationFormat,
-} as GPUCanvasConfiguration);
+export const { canvas, device, context, presentationFormat } =
+    await createGPU();
 
 //////////// SHADER ////////////
 
-const renderShader: GPUShaderModule = device.createShaderModule({
-    label: "render shader",
-    code: await fetch("./shaders/terrain/render.wgsl").then(
-        async (response: Response) => await response.text(),
-    ),
-} as GPUShaderModuleDescriptor);
+const commonShader: GPUShaderModule = await loadShader(
+    device,
+    "./shaders/terrain/common.wgsl",
+);
 
-//////////// CONSTS ////////////
-
-const byteSize: int = 4;
+const terrainShader: GPUShaderModule = await createTerrainShader(device);
 
 //////////// GPU TIMING ////////////
 
@@ -98,7 +66,7 @@ async function loadImageBitmap(url: string): Promise<ImageBitmap> {
     return await createImageBitmap(blob, { colorSpaceConversion: "none" });
 }
 
-const url: string = "./resources/heightmap-toussaint-small.png";
+const url: string = "./resources/heightmap-self0.png";
 const source: ImageBitmap = await loadImageBitmap(url);
 const texture: GPUTexture = device.createTexture({
     label: "heightmap texture",
@@ -113,7 +81,6 @@ const texture: GPUTexture = device.createTexture({
 device.queue.copyExternalImageToTexture(
     {
         source: source,
-        /*flipY: true*/
     } as GPUImageCopyExternalImage,
     {
         texture: texture,
@@ -130,11 +97,11 @@ const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
     label: "render pipeline",
     layout: "auto",
     vertex: {
-        module: renderShader,
+        module: terrainShader,
         entryPoint: "vs",
     } as GPUVertexState,
     fragment: {
-        module: renderShader,
+        module: terrainShader,
         entryPoint: "fs",
         targets: [{ format: presentationFormat }],
     } as GPUFragmentState,
@@ -233,6 +200,21 @@ device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
 log("vertecies", dotit(verteciesCount));
 log("indices", dotit(indicesCount));
 
+//////////// INSTANCES ////////////
+
+const instancesData: Float32Array = new Float32Array(
+    MaxTreeLength * ChunkInstanceLength,
+);
+
+const instancesArrayBuffer: ArrayBuffer = instancesData.buffer;
+const instancesBuffer: GPUBuffer = device.createBuffer({
+    label: "instances buffer",
+    size: instancesArrayBuffer.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+
+//log("instances", dotit(instancesCount));
+
 //////////// INDIRECT ////////////
 
 const indirectData: Uint32Array = new Uint32Array([
@@ -260,6 +242,31 @@ const indirectReadbackBuffer: GPUBuffer = device.createBuffer({
     size: indirectBuffer.size,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
+
+//////////// BINDGROUP ////////////
+
+const renderBindGroup: GPUBindGroup = device.createBindGroup({
+    label: "render bind group",
+    layout: renderPipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: { buffer: uniformBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 1,
+            resource: { buffer: verteciesBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 2,
+            resource: { buffer: instancesBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 3,
+            resource: texture.createView(),
+        } as GPUBindGroupEntry,
+    ],
+} as GPUBindGroupDescriptor);
 
 //////////// MATRIX ////////////
 
@@ -297,62 +304,38 @@ const cpuDelta: RollingAverage = new RollingAverage(60);
 const gpuDelta: RollingAverage = new RollingAverage(60);
 const renderDelta: RollingAverage = new RollingAverage(60);
 
+//////////// RENDER BUNDLE ////////////
+
+const renderBundleEncoder: GPURenderBundleEncoder =
+    device.createRenderBundleEncoder({
+        label: "render bundle",
+        colorFormats: [presentationFormat],
+        depthStencilFormat: "depth24plus",
+    } as GPURenderBundleEncoderDescriptor);
+
+renderBundleEncoder.setPipeline(renderPipeline);
+renderBundleEncoder.setBindGroup(0, renderBindGroup);
+renderBundleEncoder.setIndexBuffer(indicesBuffer, "uint32");
+renderBundleEncoder.drawIndexedIndirect(indirectBuffer, 0);
+
+const renderBundle: GPURenderBundle = renderBundleEncoder.finish();
+
 async function render(now: float): Promise<void> {
     stats.time("cpu delta");
 
     //////////// UPDATE ////////////
 
     control.update();
-
-    //////////// INSTANCES ////////////
-
-    const tree: TreeData = generateTree(new Vec3(), 256, cameraPos);
-    const instancesData: Float32Array = treeToInstances(tree);
-    const instancesCount: int = instancesData.length / ChunkInstanceLength;
-
-    const instancesArrayBuffer: ArrayBuffer = instancesData.buffer;
-    const instancesBuffer: GPUBuffer = device!.createBuffer({
-        label: "instances buffer",
-        size: instancesArrayBuffer.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    } as GPUBufferDescriptor);
-
-    device!.queue.writeBuffer(instancesBuffer, 0, instancesArrayBuffer);
-
-    //log("instances", dotit(instancesCount));
-
-    indirectData[1] = instancesCount;
-    device!.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
-
-    //////////// BINDGROUP ////////////
-
-    const renderBindGroup: GPUBindGroup = device!.createBindGroup({
-        label: "render bind group",
-        layout: renderPipeline.getBindGroupLayout(0),
-        entries: [
-            {
-                binding: 0,
-                resource: { buffer: uniformBuffer } as GPUBindingResource,
-            } as GPUBindGroupEntry,
-            {
-                binding: 1,
-                resource: { buffer: verteciesBuffer } as GPUBindingResource,
-            } as GPUBindGroupEntry,
-            {
-                binding: 2,
-                resource: { buffer: instancesBuffer } as GPUBindingResource,
-            } as GPUBindGroupEntry,
-            {
-                binding: 3,
-                resource: texture.createView(),
-            } as GPUBindGroupEntry,
-        ],
-    } as GPUBindGroupDescriptor);
-
     cameraView.view(cameraPos, cameraDir, up);
     viewProjection.multiply(cameraView, projection).store(uniformData, 0);
-
     device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
+
+    const tree: TreeData = generateTree(new Vec3(), 16, cameraPos);
+    const instancesCount: int = storeTree(instancesData, tree);
+    const len: int = instancesCount * ChunkInstanceLength * byteSize;
+    device!.queue.writeBuffer(instancesBuffer, 0, instancesArrayBuffer, 0, len);
+    indirectData[1] = instancesCount;
+    device!.queue.writeBuffer(indirectBuffer, 0, indirectArrayBuffer);
 
     //////////// RENDER ////////////
 
@@ -367,10 +350,7 @@ async function render(now: float): Promise<void> {
 
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
-    renderPass.setPipeline(renderPipeline);
-    renderPass.setBindGroup(0, renderBindGroup);
-    renderPass.setIndexBuffer(indicesBuffer, "uint32");
-    renderPass.drawIndexedIndirect(indirectBuffer, 0);
+    renderPass.executeBundles([renderBundle]);
     renderPass.end();
 
     if (indirectReadbackBuffer.mapState === "unmapped") {
@@ -397,8 +377,6 @@ async function render(now: float): Promise<void> {
 
     const renderCommandBuffer: GPUCommandBuffer = renderEncoder.finish();
     device!.queue.submit([renderCommandBuffer]);
-
-    instancesBuffer.destroy();
 
     if (indirectReadbackBuffer.mapState === "unmapped") {
         indirectReadbackBuffer.mapAsync(GPUMapMode.READ).then(() => {

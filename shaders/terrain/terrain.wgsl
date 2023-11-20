@@ -18,7 +18,7 @@ struct Instance {
 
 struct VertexShaderOut {
     @builtin(position) position: vec4f,
-    @location(0) worldPosition: vec3f
+    @location(0) positionWorld: vec3f
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -30,23 +30,22 @@ struct VertexShaderOut {
     let vertex: Vertex = vertecies[vertexIndex];
     let instance: Instance = instances[instanceIndex];
 
-    var worldPosition: vec3f = vertex.position;
-    worldPosition *= instance.size;
-    worldPosition += instance.position;
+    var positionWorld: vec3f = vertex.position;
+    positionWorld *= instance.size;
+    positionWorld += instance.position;
     
-    //worldPosition.y += fbm(worldPosition.xz * 0.01) * 10 + length(worldPosition.xz * 0.01) * 10;
-    let uv: vec2u = vec2u(((worldPosition.xz / 256) + 0.5) * 4096) + 1;
-    let texel: vec4f = textureLoad(heightmap, uv, 0); 
-    worldPosition.y += ((texel.x + texel.y + texel.z) / 3) * 100;
+    let uv: vec2u = vec2u(((positionWorld.xz / 256) * 0.9 + 0.5) * 512);
+    positionWorld.y += textureLoad(heightmap, uv, 0).r * 100;
+    positionWorld.y = fbm(positionWorld.xz * 0.01) * 10 + fbm(positionWorld.xz * 0.1) * 2;
 
     var out: VertexShaderOut;
-    out.position = uniforms.viewProjection * vec4f(worldPosition, 1);
-    out.worldPosition = worldPosition;
+    out.position = uniforms.viewProjection * vec4f(positionWorld, 1);
+    out.positionWorld = positionWorld;
     return out;
 }
 
 @fragment fn fs(in: VertexShaderOut) -> @location(0) vec4f {
-    var position: vec3f = in.worldPosition;
+    var position: vec3f = in.positionWorld;
     let normal: vec3f = normalize(cross(dpdx(position), dpdy(position)));
     return vec4f(normal * 0.5 + 0.5, 1.0);
 }

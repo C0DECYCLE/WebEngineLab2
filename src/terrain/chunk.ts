@@ -37,7 +37,7 @@ function generateGeometry(resolution: int): ChunkGeometryData {
     };
 }
 
-export const ChunkResolution: int = 64;
+export const ChunkResolution: int = 32;
 
 export const ChunkGeometry: ChunkGeometryData =
     generateGeometry(ChunkResolution);

@@ -40,3 +40,10 @@
 
 //write down all things from ghost of tsushima grass
 //restart with plan for only grass or do engine
+
+//miniature 3d stylized witcher like rpg procedural prototype
+//depth of field, advanced lighting (deferred?, global illumination)
+//fog, procedural terrain, procedural folliage vegetation grass
+//monsters, main character, loot, witcher like
+//webgpu, prototype, low poly? smooth shading?
+//procedural towns buildings
