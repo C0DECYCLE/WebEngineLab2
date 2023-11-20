@@ -13,6 +13,8 @@ import {
     storeChunk,
 } from "./chunk.js";
 
+export const TreeSize: float = 512;
+
 export type TreeData = ChunkData[];
 
 export function generateTree(origin: Vec3, size: float, point: Vec3): TreeData {
@@ -32,7 +34,7 @@ export function generateTree(origin: Vec3, size: float, point: Vec3): TreeData {
     return [{ position: origin, size: size } as ChunkData];
 }
 
-export const MaxTreeLength: int = 40;
+export const MaxTreeLength: int = 52;
 
 export function storeTree(instances: Float32Array, tree: TreeData): int {
     if (tree.length > MaxTreeLength) {

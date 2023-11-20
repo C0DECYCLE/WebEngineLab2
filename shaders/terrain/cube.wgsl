@@ -12,8 +12,7 @@ struct Vertex {
 };
 
 struct Instance {
-    position: vec3f,
-    size: f32
+    position: vec3f
 };
 
 struct VertexShaderOut {
@@ -30,15 +29,14 @@ struct VertexShaderOut {
     let instance: Instance = instances[instanceIndex];
 
     var positionWorld: vec3f = vertex.position;
-    positionWorld *= instance.size;
     positionWorld += instance.position;
-    
-    var pos: vec3f = positionWorld;
+
+    var pos: vec3f = instance.position;
     positionWorld.y += (
         max(fbm(pos.xz * 0.0005), 0) * max(fbm(pos.xz * 0.01), 0)
          + fbm(pos.xz * 0.005) * 0.1 + fbm(pos.xz * 0.1) * 0.005
     ) * 100;
-
+    
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(positionWorld, 1);
     out.positionWorld = positionWorld;
@@ -48,7 +46,7 @@ struct VertexShaderOut {
 @fragment fn fs(in: VertexShaderOut) -> @location(0) vec4f {
     var position: vec3f = in.positionWorld;
     let normal: vec3f = normalize(cross(dpdx(position), dpdy(position)));
-    return vec4f(normal * 0.5 + 0.5, 1.0);
+    return vec4f(normal * 0.1 + 0.9, 1.0);
 }
 
 //  MIT License. © Ian McEwan, Stefan Gustavson, Munrocket, Johan Helsing

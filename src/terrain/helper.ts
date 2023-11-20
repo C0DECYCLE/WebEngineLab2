@@ -47,15 +47,3 @@ export async function createGPU(): Promise<{
     } as GPUCanvasConfiguration);
     return { canvas, device, context, presentationFormat };
 }
-
-export async function loadShader(
-    device: GPUDevice,
-    url: string,
-): Promise<GPUShaderModule> {
-    return device.createShaderModule({
-        label: url,
-        code: await fetch(url).then(
-            async (response: Response) => await response.text(),
-        ),
-    } as GPUShaderModuleDescriptor);
-}
