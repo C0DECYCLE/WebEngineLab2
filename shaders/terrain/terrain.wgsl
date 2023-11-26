@@ -48,7 +48,7 @@ struct VertexShaderOut {
 @fragment fn fs(in: VertexShaderOut) -> @location(0) vec4f {
     var position: vec3f = in.positionWorld;
     let normal: vec3f = normalize(cross(dpdx(position), dpdy(position)));
-    return vec4f(normal * 0.5 + 0.5, 1.0);
+    return vec4f(normal * 0.5 + 0.5, 1);
 }
 
 //  MIT License. © Ian McEwan, Stefan Gustavson, Munrocket, Johan Helsing

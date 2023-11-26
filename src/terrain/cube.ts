@@ -38,13 +38,13 @@ export async function createCube(
 
     //////////// SETUP INDICES ////////////
 
-    const indicesCount: int = data.indicies!.length;
+    const indicesCount: int = data.indices!.length;
     const indicesBuffer: GPUBuffer = device.createBuffer({
         label: "cube index buffer",
-        size: data.indicies!.buffer.byteLength,
+        size: data.indices!.buffer.byteLength,
         usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     } as GPUBufferDescriptor);
-    device.queue.writeBuffer(indicesBuffer, 0, data.indicies!.buffer);
+    device.queue.writeBuffer(indicesBuffer, 0, data.indices!.buffer);
 
     log("cube indices", dotit(indicesCount));
 

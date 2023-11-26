@@ -9,13 +9,21 @@ import { clear } from "./utilities/utils.js";
 type OBJVertex = [float, float, float];
 export type OBJParseResult = {
     positions: Float32Array;
-    indicies?: Uint32Array;
+    indices?: Uint32Array;
 };
 
 export class OBJParser {
-    private readonly vertexCache: OBJVertex[] = [];
-    private readonly positionCache: float[] = [];
-    private readonly indexCache: int[] = [];
+    public static readonly Standard: OBJParser = new OBJParser();
+
+    private readonly vertexCache: OBJVertex[];
+    private readonly positionCache: float[];
+    private readonly indexCache: int[];
+
+    public constructor() {
+        this.vertexCache = [];
+        this.positionCache = [];
+        this.indexCache = [];
+    }
 
     public parse(raw: string, indexed: boolean = false): OBJParseResult {
         this.reset();
@@ -28,7 +36,7 @@ export class OBJParser {
             positions: new Float32Array(this.positionCache),
         } as OBJParseResult;
         if (indexed) {
-            result.indicies = new Uint32Array(this.indexCache);
+            result.indices = new Uint32Array(this.indexCache);
         }
         this.reset();
         return result;

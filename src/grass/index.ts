@@ -234,7 +234,7 @@ const raw: string = await fetch("./resources/grass.obj").then(
 );
 const parser: OBJParser = new OBJParser();
 const data: OBJParseResult = parser.parse(raw, true);
-const vertexCount: int = data.indicies!.length;
+const vertexCount: int = data.indices!.length;
 
 //log(parser.parse(raw));
 //log(parser.parse(raw, true));
@@ -246,7 +246,7 @@ const verteciesBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-const indexArrayBuffer: ArrayBuffer = data.indicies!.buffer;
+const indexArrayBuffer: ArrayBuffer = data.indices!.buffer;
 const indicesBuffer: GPUBuffer = device.createBuffer({
     label: "index buffer",
     size: indexArrayBuffer.byteLength,

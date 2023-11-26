@@ -7,11 +7,13 @@ import { int, float, FloatArray } from "../../types/utilities/utils.type.js";
 import { Mat4 } from "./Mat4.js";
 
 export class Vec3 {
+    public static Cache: Vec3 = new Vec3();
+
     private _x: float;
     private _y: float;
     private _z: float;
 
-    public isDirty: boolean = false;
+    public isDirty: boolean;
 
     public get x(): float {
         return this._x;
@@ -41,6 +43,7 @@ export class Vec3 {
     }
 
     public constructor(x: float = 0, y: float = 0, z: float = 0) {
+        this.isDirty = false;
         this.set(x, y, z);
     }
 
@@ -206,8 +209,6 @@ export class Vec3 {
     public toString(): string {
         return JSON.stringify(this);
     }
-
-    public static Cache: Vec3 = new Vec3();
 
     public static Dot(a: Vec3, b: Vec3): float {
         return a.dot(b);

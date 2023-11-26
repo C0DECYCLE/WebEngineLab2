@@ -7,12 +7,13 @@ import { int, float } from "../types/utilities/utils.type.js";
 
 export class RollingAverage {
     private readonly sampleLength: int;
-    private readonly samples: float[] = [];
+    private readonly samples: float[];
 
     private total: float = 0;
     private cursor: float = 0;
 
     public constructor(sampleLength: int = 30) {
+        this.samples = [];
         this.sampleLength = sampleLength;
     }
 

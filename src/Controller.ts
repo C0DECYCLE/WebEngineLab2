@@ -14,22 +14,32 @@ type CameraRequirements = {
 };
 
 export class Controller {
-    private isLocked: boolean = false;
+    private isLocked: boolean;
     private readonly canvas: HTMLCanvasElement;
-    private readonly activeKeys: MapString<boolean> = new MapString<boolean>();
+    private readonly activeKeys: MapString<boolean>;
 
-    private direction: Vec3 = new Vec3();
-    private readonly globalUp: Vec3 = new Vec3(0, 1, 0);
-    private left: Vec3 = new Vec3();
-    private localUp: Vec3 = new Vec3();
+    private direction: Vec3;
+    private readonly globalUp: Vec3;
+    private left: Vec3;
+    private localUp: Vec3;
 
     private readonly camera: CameraRequirements;
-    private transform: Mat4 = new Mat4();
+    private transform: Mat4;
     private velocity: float;
+    private static readonly MinVelocity: float = 0.01;
+    private static readonly DefaultVelocity: float = 0.35;
+    private static readonly MaxVelocity: float = 5;
 
     public constructor(canvas: HTMLCanvasElement, camera: CameraRequirements) {
+        this.isLocked = false;
         this.canvas = canvas;
+        this.activeKeys = new MapString<boolean>();
+        this.direction = new Vec3();
+        this.globalUp = new Vec3(0, 1, 0);
+        this.left = new Vec3();
+        this.localUp = new Vec3();
         this.camera = camera;
+        this.transform = new Mat4();
         this.initializeLocking();
         this.initializekeyboard();
         this.initializeMouse();
@@ -94,7 +104,7 @@ export class Controller {
             if (!this.isLocked) {
                 return;
             }
-            this.velocity -= event.deltaY * 0.01;
+            this.velocity -= event.deltaY * 0.001;
             this.velocity = clamp(
                 this.velocity,
                 Controller.MinVelocity,
@@ -151,8 +161,4 @@ export class Controller {
         this.activeKeys.clear();
         this.velocity = Controller.DefaultVelocity;
     }
-
-    private static readonly MinVelocity: float = 0.01;
-    private static readonly DefaultVelocity: float = 0.35;
-    private static readonly MaxVelocity: float = 5;
 }

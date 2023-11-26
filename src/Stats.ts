@@ -10,12 +10,13 @@ import {
 } from "../types/utilities/utils.type.js";
 
 export class Stats {
-    private readonly list: MapString<float> = new MapString<float>();
+    private readonly list: MapString<float>;
 
     private readonly div: HTMLDivElement;
     private readonly p: HTMLParagraphElement;
 
     public constructor() {
+        this.list = new MapString<float>();
         this.div = this.createDiv();
         this.p = this.createP(this.div);
     }

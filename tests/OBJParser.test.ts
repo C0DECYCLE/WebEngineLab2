@@ -40,7 +40,7 @@ describe("OBJParser", () => {
         const vertecies: Float32Array = result.positions;
         expect(vertecies).toBeInstanceOf(Float32Array);
         expect(vertecies.toString()).toBe(parsedVerteciesIndexed);
-        const indices: Uint32Array = result.indicies!;
+        const indices: Uint32Array = result.indices!;
         expect(indices).toBeInstanceOf(Uint32Array);
         expect(indices.toString()).toBe(parsedIndices);
     });

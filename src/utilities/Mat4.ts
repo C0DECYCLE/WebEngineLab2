@@ -7,6 +7,8 @@ import { int, float, FloatArray } from "../../types/utilities/utils.type.js";
 import { Vec3 } from "./Vec3.js";
 
 export class Mat4 {
+    public static Cache: Mat4 = new Mat4();
+
     public readonly values: Float32Array | Float64Array;
     public readonly isFloat64: boolean;
 
@@ -454,8 +456,6 @@ export class Mat4 {
     public clone(): Mat4 {
         return new Mat4(this.isFloat64).copy(this);
     }
-
-    public static Cache: Mat4 = new Mat4();
 
     public static Perspective(
         fov: float,
