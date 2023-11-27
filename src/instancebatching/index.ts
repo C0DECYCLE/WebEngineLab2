@@ -52,7 +52,7 @@ const uniformData: Float32Array = new Float32Array(uniformFloats);
 
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
-    size: uniformData.buffer.byteLength,
+    size: uniformData.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
@@ -97,30 +97,80 @@ const shader: GPUShaderModule = device.createShaderModule({
     ),
 } as GPUShaderModuleDescriptor);
 
+//////////// SETUP PIPELINE ////////////
+
+const pipeline: GPURenderPipeline = await device.createRenderPipelineAsync({
+    label: "render pipeline",
+    layout: "auto",
+    vertex: {
+        module: shader,
+        entryPoint: "vs",
+    } as GPUVertexState,
+    fragment: {
+        module: shader,
+        entryPoint: "fs",
+        targets: [{ format: presentationFormat }],
+    } as GPUFragmentState,
+    primitive: {
+        cullMode: "back",
+    } as GPUPrimitiveState,
+    depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: "less",
+        format: "depth24plus",
+    } as GPUDepthStencilState,
+} as GPURenderPipelineDescriptor);
+
 //////////// SETUP GEOMETRY ////////////
+
+const n: int = 10_000;
 
 const cube: Geometry = new Geometry(
     device,
     "cube.obj",
-    1000,
-    shader,
+    n,
     uniformBuffer,
+    pipeline,
 );
 
 const ico: Geometry = new Geometry(
     device,
     "icosphere.obj",
-    1000,
-    shader,
+    n,
     uniformBuffer,
+    pipeline,
 );
 
 const torus: Geometry = new Geometry(
     device,
     "torus.obj",
-    1000,
-    shader,
+    n,
     uniformBuffer,
+    pipeline,
+);
+
+const cylinder: Geometry = new Geometry(
+    device,
+    "cylinder.obj",
+    n,
+    uniformBuffer,
+    pipeline,
+);
+
+const cone: Geometry = new Geometry(
+    device,
+    "cone.obj",
+    n,
+    uniformBuffer,
+    pipeline,
+);
+
+const suzanne: Geometry = new Geometry(
+    device,
+    "suzanne.obj",
+    n,
+    uniformBuffer,
+    pipeline,
 );
 
 //////////// EACH FRAME ////////////
@@ -149,6 +199,9 @@ async function frame(now: float): Promise<void> {
         ...(cube.bundle ? [cube.bundle] : []),
         ...(ico.bundle ? [ico.bundle] : []),
         ...(torus.bundle ? [torus.bundle] : []),
+        ...(cylinder.bundle ? [cylinder.bundle] : []),
+        ...(cone.bundle ? [cone.bundle] : []),
+        ...(suzanne.bundle ? [suzanne.bundle] : []),
     ]);
     renderPass.end();
 

@@ -8,7 +8,6 @@ import { Vec3 } from "../utilities/Vec3.js";
 import { log } from "../utilities/logger.js";
 import { dotit } from "../utilities/utils.js";
 import { int } from "../utilities/utils.type.js";
-import { byteSize } from "./helper.js";
 
 export class Geometry {
     private readonly indirectData: Uint32Array;
@@ -17,7 +16,6 @@ export class Geometry {
     private indexBuffer: GPUBuffer;
     private instanceBuffer: GPUBuffer;
     private indirectBuffer: GPUBuffer;
-    private pipeline: GPURenderPipeline;
     private bindGroup: GPUBindGroup;
     public bundle: GPURenderBundle;
 
@@ -25,8 +23,8 @@ export class Geometry {
         device: GPUDevice,
         filePath: string,
         instances: int,
-        shader: GPUShaderModule,
         uniformBuffer: GPUBuffer,
+        pipeline: GPURenderPipeline,
     ) {
         this.indirectData = new Uint32Array([0, 0, 0, 0, 0]);
         this.instanceData = this.createInstanceData(filePath, instances);
@@ -43,13 +41,13 @@ export class Geometry {
             );
             this.instanceBuffer = this.createInstances(device, filePath);
             this.indirectBuffer = this.createIndirect(device, filePath);
-            this.pipeline = await this.createPipeline(device, filePath, shader);
             this.bindGroup = this.createBindGroup(
                 device,
                 filePath,
                 uniformBuffer,
+                pipeline,
             );
-            this.bundle = this.createBundle(device, filePath);
+            this.bundle = this.createBundle(device, filePath, pipeline);
         });
     }
 
@@ -87,7 +85,7 @@ export class Geometry {
     ): GPUBuffer {
         const buffer: GPUBuffer = device.createBuffer({
             label: `${filePath} vertex buffer`,
-            size: positions.buffer.byteLength,
+            size: positions.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         } as GPUBufferDescriptor);
         device.queue.writeBuffer(buffer, 0, positions.buffer);
@@ -103,7 +101,7 @@ export class Geometry {
     ): GPUBuffer {
         const buffer: GPUBuffer = device.createBuffer({
             label: `${filePath} index buffer`,
-            size: indices.buffer.byteLength,
+            size: indices.byteLength,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
         } as GPUBufferDescriptor);
         device.queue.writeBuffer(buffer, 0, indices.buffer);
@@ -116,7 +114,7 @@ export class Geometry {
     private createInstances(device: GPUDevice, filePath: string): GPUBuffer {
         const buffer: GPUBuffer = device.createBuffer({
             label: `${filePath} instance buffer`,
-            size: this.instanceData.buffer.byteLength,
+            size: this.instanceData.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         } as GPUBufferDescriptor);
         device.queue.writeBuffer(buffer, 0, this.instanceData.buffer);
@@ -126,7 +124,7 @@ export class Geometry {
     private createIndirect(device: GPUDevice, filePath: string): GPUBuffer {
         const buffer: GPUBuffer = device.createBuffer({
             label: `${filePath} indirect buffer`,
-            size: 5 * byteSize,
+            size: this.indirectData.byteLength,
             usage:
                 GPUBufferUsage.INDIRECT |
                 GPUBufferUsage.STORAGE |
@@ -137,44 +135,15 @@ export class Geometry {
         return buffer;
     }
 
-    private async createPipeline(
-        device: GPUDevice,
-        filePath: string,
-        shader: GPUShaderModule,
-    ): Promise<GPURenderPipeline> {
-        const presentationFormat: GPUTextureFormat =
-            navigator.gpu.getPreferredCanvasFormat();
-        return device.createRenderPipelineAsync({
-            label: `${filePath} pipeline`,
-            layout: "auto",
-            vertex: {
-                module: shader,
-                entryPoint: "vs",
-            } as GPUVertexState,
-            fragment: {
-                module: shader,
-                entryPoint: "fs",
-                targets: [{ format: presentationFormat }],
-            } as GPUFragmentState,
-            primitive: {
-                cullMode: "back",
-            } as GPUPrimitiveState,
-            depthStencil: {
-                depthWriteEnabled: true,
-                depthCompare: "less",
-                format: "depth24plus",
-            } as GPUDepthStencilState,
-        } as GPURenderPipelineDescriptor);
-    }
-
     private createBindGroup(
         device: GPUDevice,
         filePath: string,
         uniformBuffer: GPUBuffer,
+        pipeline: GPURenderPipeline,
     ): GPUBindGroup {
         return device.createBindGroup({
             label: `${filePath} bindgroup`,
-            layout: this.pipeline.getBindGroupLayout(0),
+            layout: pipeline.getBindGroupLayout(0),
             entries: [
                 {
                     binding: 0,
@@ -196,7 +165,11 @@ export class Geometry {
         } as GPUBindGroupDescriptor);
     }
 
-    private createBundle(device: GPUDevice, filePath: string): GPURenderBundle {
+    private createBundle(
+        device: GPUDevice,
+        filePath: string,
+        pipeline: GPURenderPipeline,
+    ): GPURenderBundle {
         const presentationFormat: GPUTextureFormat =
             navigator.gpu.getPreferredCanvasFormat();
         const encoder: GPURenderBundleEncoder =
@@ -205,7 +178,7 @@ export class Geometry {
                 colorFormats: [presentationFormat],
                 depthStencilFormat: "depth24plus",
             } as GPURenderBundleEncoderDescriptor);
-        encoder.setPipeline(this.pipeline);
+        encoder.setPipeline(pipeline);
         encoder.setBindGroup(0, this.bindGroup);
         encoder.setIndexBuffer(this.indexBuffer, "uint32");
         encoder.drawIndexedIndirect(this.indirectBuffer, 0);
