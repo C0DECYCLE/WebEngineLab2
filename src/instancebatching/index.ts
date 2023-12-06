@@ -125,53 +125,18 @@ const pipeline: GPURenderPipeline = await device.createRenderPipelineAsync({
 
 const n: int = 10_000;
 
-const cube: Geometry = new Geometry(
-    device,
-    "cube.obj",
-    n,
-    uniformBuffer,
-    pipeline,
-);
+const cube: Geometry = new Geometry("cube.obj");
+cube.construct(n);
 
-const ico: Geometry = new Geometry(
-    device,
-    "icosphere.obj",
-    n,
-    uniformBuffer,
-    pipeline,
-);
+const ico: Geometry = new Geometry("icosphere.obj", n);
 
-const torus: Geometry = new Geometry(
-    device,
-    "torus.obj",
-    n,
-    uniformBuffer,
-    pipeline,
-);
+const torus: Geometry = new Geometry("torus.obj", n);
 
-const cylinder: Geometry = new Geometry(
-    device,
-    "cylinder.obj",
-    n,
-    uniformBuffer,
-    pipeline,
-);
+const cylinder: Geometry = new Geometry("cylinder.obj", n);
 
-const cone: Geometry = new Geometry(
-    device,
-    "cone.obj",
-    n,
-    uniformBuffer,
-    pipeline,
-);
+const cone: Geometry = new Geometry("cone.obj", n);
 
-const suzanne: Geometry = new Geometry(
-    device,
-    "suzanne.obj",
-    n,
-    uniformBuffer,
-    pipeline,
-);
+const suzanne: Geometry = new Geometry("suzanne.obj", n);
 
 //////////// EACH FRAME ////////////
 

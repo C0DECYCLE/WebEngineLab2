@@ -10,6 +10,15 @@ import { dotit } from "../utilities/utils.js";
 import { int } from "../utilities/utils.type.js";
 
 export class Geometry {
+    public constructor(filePath: string, instances: int) {
+        //
+    }
+
+    public async construct(): Promise<void> {
+        //
+    }
+
+    /*
     private readonly indirectData: Uint32Array;
     private readonly instanceData: Float32Array;
     private vertexBuffer: GPUBuffer;
@@ -184,4 +193,5 @@ export class Geometry {
         encoder.drawIndexedIndirect(this.indirectBuffer, 0);
         return encoder.finish();
     }
+    */
 }
