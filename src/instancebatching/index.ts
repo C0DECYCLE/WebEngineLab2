@@ -7,10 +7,13 @@ import { int, float } from "../../types/utilities/utils.type.js";
 import { Controller } from "../Controller.js";
 import { Stats } from "../Stats.js";
 import { RollingAverage } from "../RollingAverage.js";
-import { createCanvas } from "./helper.js";
+import { createCanvas, loadOBJ } from "./helper.js";
 import { Camera } from "./Camera.js";
 import { GPUTiming } from "./GPUTiming.js";
-import { Geometry } from "./Geometry.js";
+import { OBJParseResult } from "../OBJParser.js";
+import { log } from "../utilities/logger.js";
+import { Vec3 } from "../utilities/Vec3.js";
+import { dotit } from "../utilities/utils.js";
 
 //////////// SETUP GPU ////////////
 
@@ -27,12 +30,12 @@ context.configure({
     format: presentationFormat,
 } as GPUCanvasConfiguration);
 
-//////////// SETUP CAMERA CONTROL ////////////
+//////////// CREATE CAMERA AND CONTROL ////////////
 
 const camera: Camera = new Camera(canvas.width / canvas.height, 1000);
 const control: Controller = new Controller(canvas, camera);
 
-//////////// SETUP STATS ////////////
+//////////// CREATE STATS ////////////
 
 const stats: Stats = new Stats();
 stats.set("frame delta", 0);
@@ -45,16 +48,195 @@ const gpuDelta: RollingAverage = new RollingAverage(60);
 
 const gpuTiming: GPUTiming = new GPUTiming(device);
 
-//////////// SETUP UNIFORMS ////////////
+//////////// LOAD OBJ ////////////
 
-const uniformFloats: int = 4 * 4;
-const uniformData: Float32Array = new Float32Array(uniformFloats);
+const cube: OBJParseResult = await loadOBJ("./resources/cube.obj");
+const icosphere: OBJParseResult = await loadOBJ("./resources/icosphere.obj");
+const torus: OBJParseResult = await loadOBJ("./resources/torus.obj");
+const cylinder: OBJParseResult = await loadOBJ("./resources/cylinder.obj");
+const cone: OBJParseResult = await loadOBJ("./resources/cone.obj");
+const suzanne: OBJParseResult = await loadOBJ("./resources/suzanne.obj");
 
+const cP: int = cube.positions.length / 4;
+const iP: int = icosphere.positions.length / 4;
+const tP: int = torus.positions.length / 4;
+const yP: int = cylinder.positions.length / 4;
+const oP: int = cone.positions.length / 4;
+const sP: int = suzanne.positions.length / 4;
+
+const cI: int = cube.indices!.length;
+const iI: int = icosphere.indices!.length;
+const tI: int = torus.indices!.length;
+const yI: int = cylinder.indices!.length;
+const oI: int = cone.indices!.length;
+const sI: int = suzanne.indices!.length;
+
+//////////// SETUP UNIFORM ////////////
+
+const uniformData: Float32Array = new Float32Array(4 * 4);
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
     size: uniformData.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
+
+//////////// SETUP VERTICES ////////////
+
+const vertexData: Float32Array = new Float32Array([
+    ...cube.positions,
+    ...icosphere.positions,
+    ...torus.positions,
+    ...cylinder.positions,
+    ...cone.positions,
+    ...suzanne.positions,
+]);
+const vertexBuffer: GPUBuffer = device.createBuffer({
+    label: "vertex buffer",
+    size: vertexData.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+log("vertices", vertexData.length / 4);
+
+//////////// SETUP INDICES ////////////
+
+const indexData: Uint32Array = new Uint32Array([
+    ...cube.indices!,
+    ...icosphere.indices!,
+    ...torus.indices!,
+    ...cylinder.indices!,
+    ...cone.indices!,
+    ...suzanne.indices!,
+]);
+const indexBuffer: GPUBuffer = device.createBuffer({
+    label: "index buffer",
+    size: indexData.byteLength,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+device.queue.writeBuffer(indexBuffer, 0, indexData);
+log("indices", indexData.length);
+
+//////////// SETUP INSTANCES ////////////
+
+const n: int = 10_000;
+const count: int = n * 6;
+const attr: int = 3 + 1;
+const floats: int = attr + attr;
+const instanceData: Float32Array = new Float32Array(floats * count);
+for (let i: int = 0; i < count; i++) {
+    new Vec3(Math.random(), Math.random(), Math.random())
+        .sub(0.5)
+        .scale(Math.cbrt(n) * 10)
+        .store(instanceData, i * floats);
+    const obj: int = Math.floor(i / n) + 1;
+    new Vec3(
+        (obj * 345.323) % 1,
+        (obj * 486.116) % 1,
+        (obj * 193.735) % 1,
+    ).store(instanceData, i * floats + attr);
+}
+const instanceBuffer: GPUBuffer = device.createBuffer({
+    label: "instance buffer",
+    size: instanceData.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+device.queue.writeBuffer(instanceBuffer, 0, instanceData);
+log("instances", dotit(n), dotit(count));
+
+//////////// SETUP INDIRECTS ////////////
+
+// prettier-ignore
+const indirectData: Uint32Array = new Uint32Array([
+    cI, n, 0,                      0,                      n * 0,
+    iI, n, cI,                     cP,                     n * 0,
+    tI, n, cI + iI,                cP + iP,                n * 0,
+    yI, n, cI + iI + tI,           cP + iP + tP,           n * 0,
+    oI, n, cI + iI + tI + yI,      cP + iP + tP + yP,      n * 0,
+    sI, n, cI + iI + tI + yI + oI, cP + iP + tP + yP + oP, n * 0,
+]);
+log(indirectData);
+const indirectBuffer: GPUBuffer = device.createBuffer({
+    label: "indirect buffer",
+    size: indirectData.byteLength,
+    usage:
+        GPUBufferUsage.INDIRECT |
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_SRC |
+        GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+device.queue.writeBuffer(indirectBuffer, 0, indirectData);
+
+//////////// LOAD SHADER ////////////
+
+const shader: GPUShaderModule = device.createShaderModule({
+    label: "shader",
+    code: await fetch("./shaders/instancebatching/shader.wgsl").then(
+        async (response: Response) => await response.text(),
+    ),
+} as GPUShaderModuleDescriptor);
+
+//////////// CREATE PIPELINE ////////////
+
+const pipeline: GPURenderPipeline = await device.createRenderPipelineAsync({
+    label: "render pipeline",
+    layout: "auto",
+    vertex: {
+        module: shader,
+        entryPoint: "vs",
+    } as GPUVertexState,
+    fragment: {
+        module: shader,
+        entryPoint: "fs",
+        targets: [{ format: presentationFormat }],
+    } as GPUFragmentState,
+    primitive: {
+        cullMode: "back",
+    } as GPUPrimitiveState,
+    depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: "less",
+        format: "depth24plus",
+    } as GPUDepthStencilState,
+} as GPURenderPipelineDescriptor);
+
+//////////// CREATE BINDGROUP ////////////
+
+const bindGroup: GPUBindGroup = device.createBindGroup({
+    label: "bindgroup",
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: { buffer: uniformBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 1,
+            resource: { buffer: vertexBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 2,
+            resource: { buffer: instanceBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+    ],
+} as GPUBindGroupDescriptor);
+
+//////////// CREATE BUNDLE ////////////
+
+const bundleEncoder: GPURenderBundleEncoder = device.createRenderBundleEncoder({
+    label: "render bundle",
+    colorFormats: [presentationFormat],
+    depthStencilFormat: "depth24plus",
+} as GPURenderBundleEncoderDescriptor);
+bundleEncoder.setPipeline(pipeline);
+bundleEncoder.setBindGroup(0, bindGroup);
+bundleEncoder.setIndexBuffer(indexBuffer, "uint32");
+bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 0);
+bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 1);
+bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 2);
+bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 3);
+bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 4);
+bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 5);
+const bundle: GPURenderBundle = bundleEncoder.finish();
 
 //////////// SETUP RENDERPASS ////////////
 
@@ -88,56 +270,6 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
     timestampWrites: gpuTiming.timestampWrites,
 } as GPURenderPassDescriptor;
 
-//////////// SETUP SHADER ////////////
-
-const shader: GPUShaderModule = device.createShaderModule({
-    label: "shader",
-    code: await fetch("./shaders/instancebatching/old.wgsl").then(
-        async (response: Response) => await response.text(),
-    ),
-} as GPUShaderModuleDescriptor);
-
-//////////// SETUP PIPELINE ////////////
-
-const pipeline: GPURenderPipeline = await device.createRenderPipelineAsync({
-    label: "render pipeline",
-    layout: "auto",
-    vertex: {
-        module: shader,
-        entryPoint: "vs",
-    } as GPUVertexState,
-    fragment: {
-        module: shader,
-        entryPoint: "fs",
-        targets: [{ format: presentationFormat }],
-    } as GPUFragmentState,
-    primitive: {
-        cullMode: "back",
-    } as GPUPrimitiveState,
-    depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: "less",
-        format: "depth24plus",
-    } as GPUDepthStencilState,
-} as GPURenderPipelineDescriptor);
-
-//////////// SETUP GEOMETRY ////////////
-
-const n: int = 10_000;
-
-const cube: Geometry = new Geometry("cube.obj");
-cube.construct(n);
-
-const ico: Geometry = new Geometry("icosphere.obj", n);
-
-const torus: Geometry = new Geometry("torus.obj", n);
-
-const cylinder: Geometry = new Geometry("cylinder.obj", n);
-
-const cone: Geometry = new Geometry("cone.obj", n);
-
-const suzanne: Geometry = new Geometry("suzanne.obj", n);
-
 //////////// EACH FRAME ////////////
 
 async function frame(now: float): Promise<void> {
@@ -147,7 +279,7 @@ async function frame(now: float): Promise<void> {
 
     control.update();
     camera.update().store(uniformData, 0);
-    device!.queue.writeBuffer(uniformBuffer, 0, uniformData.buffer);
+    device!.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
     //////////// RENDER FRAME ////////////
 
@@ -160,14 +292,7 @@ async function frame(now: float): Promise<void> {
 
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
-    renderPass.executeBundles([
-        ...(cube.bundle ? [cube.bundle] : []),
-        ...(ico.bundle ? [ico.bundle] : []),
-        ...(torus.bundle ? [torus.bundle] : []),
-        ...(cylinder.bundle ? [cylinder.bundle] : []),
-        ...(cone.bundle ? [cone.bundle] : []),
-        ...(suzanne.bundle ? [suzanne.bundle] : []),
-    ]);
+    renderPass.executeBundles([bundle]);
     renderPass.end();
 
     gpuTiming.resolve(renderEncoder);
