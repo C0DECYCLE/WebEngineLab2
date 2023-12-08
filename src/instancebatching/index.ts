@@ -11,6 +11,7 @@ import { createCanvas } from "./helper.js";
 import { Camera } from "./Camera.js";
 import { GPUTiming } from "./GPUTiming.js";
 import { Geometry } from "./Geometry.js";
+//import { log } from "../utilities/logger.js";
 
 //////////// SETUP GPU ////////////
 
@@ -125,6 +126,8 @@ const pipeline: GPURenderPipeline = await device.createRenderPipelineAsync({
 
 const n: int = 10_000;
 
+const geos: Geometry[] = [];
+
 const cube: Geometry = new Geometry(
     device,
     "cube.obj",
@@ -132,6 +135,7 @@ const cube: Geometry = new Geometry(
     uniformBuffer,
     pipeline,
 );
+geos.push(cube);
 
 const ico: Geometry = new Geometry(
     device,
@@ -140,6 +144,7 @@ const ico: Geometry = new Geometry(
     uniformBuffer,
     pipeline,
 );
+geos.push(ico);
 
 const torus: Geometry = new Geometry(
     device,
@@ -148,6 +153,7 @@ const torus: Geometry = new Geometry(
     uniformBuffer,
     pipeline,
 );
+geos.push(torus);
 
 const cylinder: Geometry = new Geometry(
     device,
@@ -156,6 +162,7 @@ const cylinder: Geometry = new Geometry(
     uniformBuffer,
     pipeline,
 );
+geos.push(cylinder);
 
 const cone: Geometry = new Geometry(
     device,
@@ -164,6 +171,7 @@ const cone: Geometry = new Geometry(
     uniformBuffer,
     pipeline,
 );
+geos.push(cone);
 
 const suzanne: Geometry = new Geometry(
     device,
@@ -172,6 +180,7 @@ const suzanne: Geometry = new Geometry(
     uniformBuffer,
     pipeline,
 );
+geos.push(suzanne);
 
 //////////// EACH FRAME ////////////
 
@@ -195,14 +204,9 @@ async function frame(now: float): Promise<void> {
 
     const renderPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(renderPassDescriptor);
-    renderPass.executeBundles([
-        ...(cube.bundle ? [cube.bundle] : []),
-        ...(ico.bundle ? [ico.bundle] : []),
-        ...(torus.bundle ? [torus.bundle] : []),
-        ...(cylinder.bundle ? [cylinder.bundle] : []),
-        ...(cone.bundle ? [cone.bundle] : []),
-        ...(suzanne.bundle ? [suzanne.bundle] : []),
-    ]);
+    renderPass.executeBundles(
+        geos.flatMap((geo: Geometry) => (geo.bundle ? [geo.bundle] : [])),
+    );
     renderPass.end();
 
     gpuTiming.resolve(renderEncoder);
