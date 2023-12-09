@@ -166,8 +166,8 @@ const raw: string = await fetch("./resources/cube.obj").then(
 );
 const parser: OBJParser = new OBJParser();
 const data: OBJParseResult = parser.parse(raw, true);
-const verteciesCount: int = data.positions.length / 4;
-const indicesCount: int = data.indices!.length;
+const verteciesCount: int = data.positionsCount;
+const indicesCount: int = data.indicesCount!;
 
 const vertexArrayBuffer: ArrayBuffer = data.positions.buffer;
 const verteciesBuffer: GPUBuffer = device.createBuffer({

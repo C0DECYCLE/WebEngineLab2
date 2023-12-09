@@ -26,7 +26,7 @@ export async function createCube(
 
     //////////// SETUP VERTECIES ////////////
 
-    const verteciesCount: int = data.positions.length / 4;
+    const verteciesCount: int = data.positionsCount;
     const verteciesBuffer: GPUBuffer = device.createBuffer({
         label: "cube vertex buffer",
         size: data.positions.buffer.byteLength,
