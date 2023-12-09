@@ -20,7 +20,7 @@ import { dotit } from "../utilities/utils.js";
 const canvas: HTMLCanvasElement = createCanvas();
 const adapter: GPUAdapter = (await navigator.gpu?.requestAdapter())!;
 const device: GPUDevice = (await adapter?.requestDevice({
-    requiredFeatures: ["timestamp-query"],
+    requiredFeatures: ["timestamp-query", "indirect-first-instance"],
 } as GPUDeviceDescriptor))!;
 const context: GPUCanvasContext = canvas.getContext("webgpu")!;
 const presentationFormat: GPUTextureFormat =
@@ -62,7 +62,6 @@ const iP: int = icosphere.positions.length / 4;
 const tP: int = torus.positions.length / 4;
 const yP: int = cylinder.positions.length / 4;
 const oP: int = cone.positions.length / 4;
-const sP: int = suzanne.positions.length / 4;
 
 const cI: int = cube.indices!.length;
 const iI: int = icosphere.indices!.length;
@@ -148,11 +147,11 @@ log("instances", dotit(n), dotit(count));
 // prettier-ignore
 const indirectData: Uint32Array = new Uint32Array([
     cI, n, 0,                      0,                      n * 0,
-    iI, n, cI,                     cP,                     n * 0,
-    tI, n, cI + iI,                cP + iP,                n * 0,
-    yI, n, cI + iI + tI,           cP + iP + tP,           n * 0,
-    oI, n, cI + iI + tI + yI,      cP + iP + tP + yP,      n * 0,
-    sI, n, cI + iI + tI + yI + oI, cP + iP + tP + yP + oP, n * 0,
+    iI, n, cI,                     cP,                     n * 1,
+    tI, n, cI + iI,                cP + iP,                n * 2,
+    yI, n, cI + iI + tI,           cP + iP + tP,           n * 3,
+    oI, n, cI + iI + tI + yI,      cP + iP + tP + yP,      n * 4,
+    sI, n, cI + iI + tI + yI + oI, cP + iP + tP + yP + oP, n * 5,
 ]);
 log(indirectData);
 const indirectBuffer: GPUBuffer = device.createBuffer({
