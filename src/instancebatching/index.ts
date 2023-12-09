@@ -57,18 +57,16 @@ const cylinder: OBJParseResult = await loadOBJ("./resources/cylinder.obj");
 const cone: OBJParseResult = await loadOBJ("./resources/cone.obj");
 const suzanne: OBJParseResult = await loadOBJ("./resources/suzanne.obj");
 
-const cP: int = cube.positions.length / 4;
-const iP: int = icosphere.positions.length / 4;
-const tP: int = torus.positions.length / 4;
-const yP: int = cylinder.positions.length / 4;
-const oP: int = cone.positions.length / 4;
+const geometries: OBJParseResult[] = [
+    cube,
+    icosphere,
+    torus,
+    cylinder,
+    cone,
+    suzanne,
+];
 
-const cI: int = cube.indices!.length;
-const iI: int = icosphere.indices!.length;
-const tI: int = torus.indices!.length;
-const yI: int = cylinder.indices!.length;
-const oI: int = cone.indices!.length;
-const sI: int = suzanne.indices!.length;
+let bytes: int = 0;
 
 //////////// SETUP UNIFORM ////////////
 
@@ -78,17 +76,13 @@ const uniformBuffer: GPUBuffer = device.createBuffer({
     size: uniformData.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
+bytes += uniformBuffer.size;
 
 //////////// SETUP VERTICES ////////////
 
-const vertexData: Float32Array = new Float32Array([
-    ...cube.positions,
-    ...icosphere.positions,
-    ...torus.positions,
-    ...cylinder.positions,
-    ...cone.positions,
-    ...suzanne.positions,
-]);
+const vertexData: Float32Array = new Float32Array(
+    geometries.flatMap((geometry: OBJParseResult) => [...geometry.positions]),
+);
 const vertexBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
     size: vertexData.byteLength,
@@ -96,17 +90,13 @@ const vertexBuffer: GPUBuffer = device.createBuffer({
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(vertexBuffer, 0, vertexData);
 log("vertices", vertexData.length / 4);
+bytes += vertexBuffer.size;
 
 //////////// SETUP INDICES ////////////
 
-const indexData: Uint32Array = new Uint32Array([
-    ...cube.indices!,
-    ...icosphere.indices!,
-    ...torus.indices!,
-    ...cylinder.indices!,
-    ...cone.indices!,
-    ...suzanne.indices!,
-]);
+const indexData: Uint32Array = new Uint32Array(
+    geometries.flatMap((geometry: OBJParseResult) => [...geometry.indices!]),
+);
 const indexBuffer: GPUBuffer = device.createBuffer({
     label: "index buffer",
     size: indexData.byteLength,
@@ -114,11 +104,12 @@ const indexBuffer: GPUBuffer = device.createBuffer({
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(indexBuffer, 0, indexData);
 log("indices", indexData.length);
+bytes += indexBuffer.size;
 
 //////////// SETUP INSTANCES ////////////
 
 const n: int = 10_000;
-const count: int = n * 6;
+const count: int = n * geometries.length;
 const attr: int = 3 + 1;
 const floats: int = attr + attr;
 const instanceData: Float32Array = new Float32Array(floats * count);
@@ -141,19 +132,21 @@ const instanceBuffer: GPUBuffer = device.createBuffer({
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(instanceBuffer, 0, instanceData);
 log("instances", dotit(n), dotit(count));
+bytes += instanceBuffer.size;
 
 //////////// SETUP INDIRECTS ////////////
 
-// prettier-ignore
-const indirectData: Uint32Array = new Uint32Array([
-    cI, n, 0,                      0,                      n * 0,
-    iI, n, cI,                     cP,                     n * 1,
-    tI, n, cI + iI,                cP + iP,                n * 2,
-    yI, n, cI + iI + tI,           cP + iP + tP,           n * 3,
-    oI, n, cI + iI + tI + yI,      cP + iP + tP + yP,      n * 4,
-    sI, n, cI + iI + tI + yI + oI, cP + iP + tP + yP + oP, n * 5,
-]);
-log(indirectData);
+const indirectData: Uint32Array = new Uint32Array(5 * geometries.length);
+let totalIndices: int = 0;
+let totalPositions: int = 0;
+geometries.forEach((geometry: OBJParseResult, i: int) => {
+    indirectData.set(
+        [geometry.indicesCount!, n, totalIndices, totalPositions, n * i],
+        5 * i,
+    );
+    totalIndices += geometry.indicesCount!;
+    totalPositions += geometry.positionsCount;
+});
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
     size: indirectData.byteLength,
@@ -164,6 +157,9 @@ const indirectBuffer: GPUBuffer = device.createBuffer({
         GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(indirectBuffer, 0, indirectData);
+bytes += indirectBuffer.size;
+
+log("vram", dotit(bytes));
 
 //////////// LOAD SHADER ////////////
 
@@ -229,12 +225,9 @@ const bundleEncoder: GPURenderBundleEncoder = device.createRenderBundleEncoder({
 bundleEncoder.setPipeline(pipeline);
 bundleEncoder.setBindGroup(0, bindGroup);
 bundleEncoder.setIndexBuffer(indexBuffer, "uint32");
-bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 0);
-bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 1);
-bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 2);
-bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 3);
-bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 4);
-bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * 5);
+geometries.forEach((_geometry: OBJParseResult, i: int) => {
+    bundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * i);
+});
 const bundle: GPURenderBundle = bundleEncoder.finish();
 
 //////////// SETUP RENDERPASS ////////////

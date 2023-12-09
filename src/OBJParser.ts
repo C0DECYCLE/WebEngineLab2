@@ -9,7 +9,9 @@ import { clear } from "./utilities/utils.js";
 type OBJVertex = [float, float, float];
 export type OBJParseResult = {
     positions: Float32Array;
+    positionsCount: int;
     indices?: Uint32Array;
+    indicesCount?: int;
 };
 
 export class OBJParser {
@@ -34,9 +36,11 @@ export class OBJParser {
         }
         const result: OBJParseResult = {
             positions: new Float32Array(this.positionCache),
+            positionsCount: this.positionCache.length / 4,
         } as OBJParseResult;
         if (indexed) {
             result.indices = new Uint32Array(this.indexCache);
+            result.indicesCount = this.indexCache.length;
         }
         this.reset();
         return result;
