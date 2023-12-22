@@ -184,9 +184,18 @@ const depthTarget: GPUTexture = device.createTexture({
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 } as GPUTextureDescriptor);
 
+const normalFormat: GPUTextureFormat = "rgba16float";
+const normalTarget: GPUTexture = device.createTexture({
+    label: "normal target texture",
+    size: [canvas.width, canvas.height],
+    format: normalFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+});
+
 const targetViews = {
     color: colorTarget.createView(),
     depth: depthTarget.createView(),
+    normal: normalTarget.createView(),
 };
 
 //////////// CREATE PIPELINE ////////////
@@ -202,7 +211,7 @@ const targetPipeline: GPURenderPipeline =
         fragment: {
             module: targetShader,
             entryPoint: "fs",
-            targets: [{ format: colorFormat }],
+            targets: [{ format: colorFormat }, { format: normalFormat }],
         } as GPUFragmentState,
         primitive: {
             topology: "triangle-list",
@@ -261,6 +270,7 @@ const deferredBindGroup: GPUBindGroup = device.createBindGroup({
     entries: [
         { binding: 0, resource: targetViews.color } as GPUBindGroupEntry,
         { binding: 1, resource: targetViews.depth } as GPUBindGroupEntry,
+        { binding: 2, resource: targetViews.normal } as GPUBindGroupEntry,
     ],
 } as GPUBindGroupDescriptor);
 
@@ -282,9 +292,17 @@ const depthStencilAttachment: GPURenderPassDepthStencilAttachment = {
     depthStoreOp: "store",
 } as GPURenderPassDepthStencilAttachment;
 
+const normalTargetAttachment: GPURenderPassColorAttachment = {
+    label: "normal target attachment",
+    view: targetViews.normal,
+    clearValue: [0, 0, 0, 1],
+    loadOp: "clear",
+    storeOp: "store",
+} as GPURenderPassColorAttachment;
+
 const targetPassDescriptor: GPURenderPassDescriptor = {
     label: "target render pass",
-    colorAttachments: [colorTargetAttachment],
+    colorAttachments: [colorTargetAttachment, normalTargetAttachment],
     depthStencilAttachment: depthStencilAttachment,
     timestampWrites: targetGPUTiming.timestampWrites,
 } as GPURenderPassDescriptor;
@@ -308,7 +326,7 @@ const deferredPassDescriptor: GPURenderPassDescriptor = {
 const targetBundleEncoder: GPURenderBundleEncoder =
     device.createRenderBundleEncoder({
         label: "target bundle",
-        colorFormats: [colorFormat],
+        colorFormats: [colorFormat, normalFormat],
         depthStencilFormat: depthFormat,
     } as GPURenderBundleEncoderDescriptor);
 targetBundleEncoder.setPipeline(targetPipeline);
