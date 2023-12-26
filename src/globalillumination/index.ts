@@ -132,23 +132,33 @@ log("indices", dotit(indexData.length));
 
 //////////// SETUP PROBES ////////////
 
-const probeCountX: int = 2;
-const probeCountY: int = 2;
-const probeCountZ: int = 2;
+const probeCountX: int = 5;
+const probeCountY: int = 3;
+const probeCountZ: int = 5;
 const probeCount: int = probeCountX * probeCountY * probeCountZ;
 const probeLayout: int = vec3Layout + vec3Layout;
 const probeData: Float32Array = new Float32Array(probeCount * probeLayout);
 
+const spread: float = 16;
 let i: int = 0;
-for (let z: int = 0; z < probeCountZ; z++) {
-    for (let y: int = 0; y < probeCountY; y++) {
+for (let y: int = 0; y < probeCountY; y++) {
+    for (let z: int = 0; z < probeCountZ; z++) {
         for (let x: int = 0; x < probeCountX; x++) {
-            const position: Vec3 = new Vec3(x * 4, y * 4, z * 4);
-            const color: Vec3 = new Vec3(
-                Math.random(),
-                Math.random(),
-                Math.random(),
-            );
+            const position: Vec3 = new Vec3(
+                x - Math.floor(probeCountX / 2),
+                y - 0,
+                z - Math.floor(probeCountZ / 2),
+            ).scale(spread);
+
+            const color: Vec3 = new Vec3();
+            if (position.length() === 0) {
+                color.set(0.7, 0.2, 0.3);
+            } else if (y === 0) {
+                color.set(0.9, 0.85, 0.95);
+            } else {
+                color.set(0.6, 0.7, 0.7);
+            }
+
             position.store(probeData, i * probeLayout + 0 * vec3Layout);
             color.store(probeData, i * probeLayout + 1 * vec3Layout);
             i++;
@@ -176,7 +186,7 @@ type Entity = {
 const entities: Entity[] = [
     {
         position: new Vec3(0, -0.5, 0),
-        scaling: new Vec3(50, 1, 50),
+        scaling: new Vec3(100, 1, 100),
         color: new Vec3(0.9, 0.85, 0.95),
         geometryId: 0,
     } as Entity,
@@ -206,23 +216,26 @@ const entities: Entity[] = [
     } as Entity,
 ];
 
-for (let i: int = 0; i < probeCount; i++) {
-    const position: Vec3 = new Vec3(
-        probeData[i * probeLayout + 0 * vec3Layout + 0],
-        probeData[i * probeLayout + 0 * vec3Layout + 1],
-        probeData[i * probeLayout + 0 * vec3Layout + 2],
-    );
-    const color: Vec3 = new Vec3(
-        probeData[i * probeLayout + 1 * vec3Layout + 0],
-        probeData[i * probeLayout + 1 * vec3Layout + 1],
-        probeData[i * probeLayout + 1 * vec3Layout + 2],
-    );
-    entities.push({
-        position: position,
-        scaling: new Vec3(0.5, 0.5, 0.5),
-        color: color,
-        geometryId: 1,
-    } as Entity);
+const debugProbes: boolean = false;
+if (debugProbes) {
+    for (let i: int = 0; i < probeCount; i++) {
+        const position: Vec3 = new Vec3(
+            probeData[i * probeLayout + 0 * vec3Layout + 0],
+            probeData[i * probeLayout + 0 * vec3Layout + 1],
+            probeData[i * probeLayout + 0 * vec3Layout + 2],
+        );
+        const color: Vec3 = new Vec3(
+            probeData[i * probeLayout + 1 * vec3Layout + 0],
+            probeData[i * probeLayout + 1 * vec3Layout + 1],
+            probeData[i * probeLayout + 1 * vec3Layout + 2],
+        );
+        entities.push({
+            position: position,
+            scaling: new Vec3(0.5, 0.5, 0.5),
+            color: color,
+            geometryId: 1,
+        } as Entity);
+    }
 }
 
 const geometryCounts: int[] = new Array(geometries.length).fill(0);
@@ -475,6 +488,10 @@ const deferredBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 4, resource: targetViews.position } as GPUBindGroupEntry,
         { binding: 5, resource: targetViews.shadow } as GPUBindGroupEntry,
         { binding: 6, resource: shadowSampler } as GPUBindGroupEntry,
+        {
+            binding: 7,
+            resource: { buffer: probeBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
     ],
 } as GPUBindGroupDescriptor);
 
