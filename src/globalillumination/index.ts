@@ -13,6 +13,7 @@ import { GPUTiming } from "./GPUTiming.js";
 import { OBJParseResult } from "../OBJParser.js";
 import { log } from "../utilities/logger.js";
 import { Vec3 } from "../utilities/Vec3.js";
+import { Mat4 } from "../utilities/Mat4.js";
 import { dotit } from "../utilities/utils.js";
 
 //////////// SETUP GPU ////////////
@@ -35,6 +36,24 @@ context.configure({
 const camera: Camera = new Camera(canvas.width / canvas.height, 1000);
 const control: Controller = new Controller(canvas, camera);
 
+//////////// CREATE LIGHT AND SHADOW ////////////
+
+const shadowSize: int = 1024;
+const shadowBias: int = 0.005;
+const shadowRadius: float = 30;
+const lightDirection: Vec3 = new Vec3(0.27, -0.71, 0.35).normalize().scale(-1);
+const lightViewProjection: Mat4 = new Mat4().multiply(
+    Mat4.View(new Vec3(0, 0, 0), lightDirection, new Vec3(0, 1, 0)),
+    Mat4.Orthogonal(
+        -shadowRadius,
+        shadowRadius,
+        shadowRadius,
+        -shadowRadius,
+        -shadowRadius,
+        shadowRadius,
+    ),
+);
+
 //////////// CREATE STATS ////////////
 
 const stats: Stats = new Stats();
@@ -44,9 +63,11 @@ stats.show();
 
 const frameDelta: RollingAverage = new RollingAverage(60);
 const cpuDelta: RollingAverage = new RollingAverage(60);
+const gpuShadowDelta: RollingAverage = new RollingAverage(60);
 const gpuTargetDelta: RollingAverage = new RollingAverage(60);
 const gpuDeferredDelta: RollingAverage = new RollingAverage(60);
 
+const shadowGPUTiming: GPUTiming = new GPUTiming(device);
 const targetGPUTiming: GPUTiming = new GPUTiming(device);
 const deferredGPUTiming: GPUTiming = new GPUTiming(device);
 
@@ -70,12 +91,18 @@ const geometries: OBJParseResult[] = [
 
 //////////// SETUP UNIFORM ////////////
 
-const uniformData: Float32Array = new Float32Array(4 * 4);
+const vec3Layout: int = 3 + 1;
+const uniformLayout = 4 * 4 + vec3Layout + 4 * 4 + (1 + 1 + 2);
+const uniformData: Float32Array = new Float32Array(uniformLayout);
 const uniformBuffer: GPUBuffer = device.createBuffer({
-    label: "uniforms uniform buffer",
+    label: "uniform buffer",
     size: uniformData.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
+lightDirection.store(uniformData, 16);
+lightViewProjection.store(uniformData, 20);
+uniformData.set([shadowSize, shadowBias], 36);
+device!.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
 //////////// SETUP VERTICES ////////////
 
@@ -88,7 +115,7 @@ const vertexBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-log("vertices", vertexData.length / 4);
+log("vertices", dotit(vertexData.length / 4));
 
 //////////// SETUP INDICES ////////////
 
@@ -101,48 +128,149 @@ const indexBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(indexBuffer, 0, indexData);
-log("indices", indexData.length);
+log("indices", dotit(indexData.length));
+
+//////////// SETUP PROBES ////////////
+
+const probeCountX: int = 2;
+const probeCountY: int = 2;
+const probeCountZ: int = 2;
+const probeCount: int = probeCountX * probeCountY * probeCountZ;
+const probeLayout: int = vec3Layout + vec3Layout;
+const probeData: Float32Array = new Float32Array(probeCount * probeLayout);
+
+let i: int = 0;
+for (let z: int = 0; z < probeCountZ; z++) {
+    for (let y: int = 0; y < probeCountY; y++) {
+        for (let x: int = 0; x < probeCountX; x++) {
+            const position: Vec3 = new Vec3(x * 4, y * 4, z * 4);
+            const color: Vec3 = new Vec3(
+                Math.random(),
+                Math.random(),
+                Math.random(),
+            );
+            position.store(probeData, i * probeLayout + 0 * vec3Layout);
+            color.store(probeData, i * probeLayout + 1 * vec3Layout);
+            i++;
+        }
+    }
+}
+
+const probeBuffer: GPUBuffer = device.createBuffer({
+    label: "probe buffer",
+    size: probeData.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+} as GPUBufferDescriptor);
+device.queue.writeBuffer(probeBuffer, 0, probeData);
+log("probes", dotit(probeCount));
 
 //////////// SETUP INSTANCES ////////////
 
-const n: int = 1;
-const count: int = n * geometries.length;
-const attr: int = 3 + 1;
-const floats: int = attr + attr;
-const instanceData: Float32Array = new Float32Array(floats * count);
-for (let i: int = 0; i < count; i++) {
-    new Vec3(Math.random(), Math.random(), Math.random())
-        .sub(0.5)
-        .scale(Math.cbrt(n) * 10)
-        .store(instanceData, i * floats);
-    const obj: int = Math.floor(i / n) + 1;
-    new Vec3(
-        (obj * 345.323) % 1,
-        (obj * 486.116) % 1,
-        (obj * 193.735) % 1,
-    ).store(instanceData, i * floats + attr);
+type Entity = {
+    position: Vec3;
+    scaling: Vec3;
+    color: Vec3;
+    geometryId: int;
+};
+
+const entities: Entity[] = [
+    {
+        position: new Vec3(0, -0.5, 0),
+        scaling: new Vec3(50, 1, 50),
+        color: new Vec3(0.9, 0.85, 0.95),
+        geometryId: 0,
+    } as Entity,
+    {
+        position: new Vec3(0, 0.9, 0),
+        scaling: new Vec3(1, 1, 1),
+        color: new Vec3(0.7, 0.2, 0.3),
+        geometryId: 5,
+    } as Entity,
+    {
+        position: new Vec3(-15, 6, -4),
+        scaling: new Vec3(14, 12, 18),
+        color: new Vec3(0.6, 0.7, 0.7),
+        geometryId: 0,
+    } as Entity,
+    {
+        position: new Vec3(-8, 8, -13),
+        scaling: new Vec3(4, 8, 4),
+        color: new Vec3(0.6, 0.7, 0.7),
+        geometryId: 3,
+    } as Entity,
+    {
+        position: new Vec3(-8, 20, -13),
+        scaling: new Vec3(5, 4, 5),
+        color: new Vec3(0.6, 0.7, 0.7),
+        geometryId: 4,
+    } as Entity,
+];
+
+for (let i: int = 0; i < probeCount; i++) {
+    const position: Vec3 = new Vec3(
+        probeData[i * probeLayout + 0 * vec3Layout + 0],
+        probeData[i * probeLayout + 0 * vec3Layout + 1],
+        probeData[i * probeLayout + 0 * vec3Layout + 2],
+    );
+    const color: Vec3 = new Vec3(
+        probeData[i * probeLayout + 1 * vec3Layout + 0],
+        probeData[i * probeLayout + 1 * vec3Layout + 1],
+        probeData[i * probeLayout + 1 * vec3Layout + 2],
+    );
+    entities.push({
+        position: position,
+        scaling: new Vec3(0.5, 0.5, 0.5),
+        color: color,
+        geometryId: 1,
+    } as Entity);
 }
+
+const geometryCounts: int[] = new Array(geometries.length).fill(0);
+const entityCount: int = entities.length;
+const instanceLayout: int = vec3Layout + vec3Layout + vec3Layout;
+const instanceData: Float32Array = new Float32Array(
+    instanceLayout * entityCount,
+);
+
+entities.sort((a: Entity, b: Entity) => a.geometryId - b.geometryId);
+entities.forEach((entity: Entity, i: int) => {
+    entity.position.store(instanceData, i * instanceLayout + 0 * vec3Layout);
+    entity.scaling.store(instanceData, i * instanceLayout + 1 * vec3Layout);
+    entity.color.store(instanceData, i * instanceLayout + 2 * vec3Layout);
+    geometryCounts[entity.geometryId]++;
+});
+
 const instanceBuffer: GPUBuffer = device.createBuffer({
     label: "instance buffer",
     size: instanceData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(instanceBuffer, 0, instanceData);
-log("instances", dotit(n), dotit(count));
+log("instances/entities", dotit(entityCount));
 
 //////////// SETUP INDIRECTS ////////////
 
 const indirectData: Uint32Array = new Uint32Array(5 * geometries.length);
 let totalIndices: int = 0;
 let totalPositions: int = 0;
+let totalN: int = 0;
+
 geometries.forEach((geometry: OBJParseResult, i: int) => {
     indirectData.set(
-        [geometry.indicesCount!, n, totalIndices, totalPositions, n * i],
+        [
+            geometry.indicesCount!,
+            geometryCounts[i],
+            totalIndices,
+            totalPositions,
+            totalN,
+        ],
         5 * i,
     );
     totalIndices += geometry.indicesCount!;
     totalPositions += geometry.positionsCount;
+    totalN += geometryCounts[i];
 });
+
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
     size: indirectData.byteLength,
@@ -156,6 +284,11 @@ device.queue.writeBuffer(indirectBuffer, 0, indirectData);
 
 //////////// LOAD SHADER ////////////
 
+const shadowShader: GPUShaderModule = device.createShaderModule({
+    label: "shadow shader",
+    code: await loadText("./shaders/globalillumination/shadow.wgsl"),
+} as GPUShaderModuleDescriptor);
+
 const targetShader: GPUShaderModule = device.createShaderModule({
     label: "target shader",
     code: await loadText("./shaders/globalillumination/targets.wgsl"),
@@ -167,6 +300,18 @@ const deferredShader: GPUShaderModule = device.createShaderModule({
 } as GPUShaderModuleDescriptor);
 
 //////////// RENDER TARGETS ////////////
+
+const shadowFormat: GPUTextureFormat = "depth32float";
+const shadowTarget: GPUTexture = device.createTexture({
+    label: "shadow target texture",
+    size: [shadowSize, shadowSize, 1],
+    format: shadowFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+} as GPUTextureDescriptor);
+const shadowSampler: GPUSampler = device.createSampler({
+    label: "shadow sampler",
+    compare: "less",
+} as GPUSamplerDescriptor);
 
 const colorFormat: GPUTextureFormat = "bgra8unorm";
 const colorTarget: GPUTexture = device.createTexture({
@@ -192,13 +337,42 @@ const normalTarget: GPUTexture = device.createTexture({
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 });
 
+const positionFormat: GPUTextureFormat = "rgba32float";
+const positionTarget: GPUTexture = device.createTexture({
+    label: "position target texture",
+    size: [canvas.width, canvas.height],
+    format: positionFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+});
+
 const targetViews = {
+    shadow: shadowTarget.createView(),
     color: colorTarget.createView(),
     depth: depthTarget.createView(),
     normal: normalTarget.createView(),
+    position: positionTarget.createView(),
 };
 
 //////////// CREATE PIPELINE ////////////
+
+const shadowPipeline: GPURenderPipeline =
+    await device.createRenderPipelineAsync({
+        label: "shadow pipeline",
+        layout: "auto",
+        vertex: {
+            module: shadowShader,
+            entryPoint: "vs",
+        } as GPUVertexState,
+        primitive: {
+            topology: "triangle-list",
+            cullMode: "back",
+        } as GPUPrimitiveState,
+        depthStencil: {
+            depthWriteEnabled: true,
+            depthCompare: "less",
+            format: shadowFormat,
+        } as GPUDepthStencilState,
+    } as GPURenderPipelineDescriptor);
 
 const targetPipeline: GPURenderPipeline =
     await device.createRenderPipelineAsync({
@@ -211,7 +385,11 @@ const targetPipeline: GPURenderPipeline =
         fragment: {
             module: targetShader,
             entryPoint: "fs",
-            targets: [{ format: colorFormat }, { format: normalFormat }],
+            targets: [
+                { format: colorFormat },
+                { format: normalFormat },
+                { format: positionFormat },
+            ],
         } as GPUFragmentState,
         primitive: {
             topology: "triangle-list",
@@ -245,6 +423,25 @@ const deferredPipeline: GPURenderPipeline =
 
 //////////// CREATE BINDGROUP ////////////
 
+const shadowBindGroup: GPUBindGroup = device.createBindGroup({
+    label: "shadow bindgroup",
+    layout: shadowPipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: { buffer: uniformBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 1,
+            resource: { buffer: vertexBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        {
+            binding: 2,
+            resource: { buffer: instanceBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+    ],
+} as GPUBindGroupDescriptor);
+
 const targetBindGroup: GPUBindGroup = device.createBindGroup({
     label: "target bindgroup",
     layout: targetPipeline.getBindGroupLayout(0),
@@ -268,13 +465,35 @@ const deferredBindGroup: GPUBindGroup = device.createBindGroup({
     label: "deferred bindgroup",
     layout: deferredPipeline.getBindGroupLayout(0),
     entries: [
-        { binding: 0, resource: targetViews.color } as GPUBindGroupEntry,
-        { binding: 1, resource: targetViews.depth } as GPUBindGroupEntry,
-        { binding: 2, resource: targetViews.normal } as GPUBindGroupEntry,
+        {
+            binding: 0,
+            resource: { buffer: uniformBuffer } as GPUBindingResource,
+        } as GPUBindGroupEntry,
+        { binding: 1, resource: targetViews.color } as GPUBindGroupEntry,
+        { binding: 2, resource: targetViews.depth } as GPUBindGroupEntry,
+        { binding: 3, resource: targetViews.normal } as GPUBindGroupEntry,
+        { binding: 4, resource: targetViews.position } as GPUBindGroupEntry,
+        { binding: 5, resource: targetViews.shadow } as GPUBindGroupEntry,
+        { binding: 6, resource: shadowSampler } as GPUBindGroupEntry,
     ],
 } as GPUBindGroupDescriptor);
 
 //////////// SETUP RENDERPASS DESCRIPTORS ////////////
+
+const shadowDepthStencilAttachment: GPURenderPassDepthStencilAttachment = {
+    label: "shadow depth stencil attachment",
+    view: targetViews.shadow,
+    depthClearValue: 1,
+    depthLoadOp: "clear",
+    depthStoreOp: "store",
+} as GPURenderPassDepthStencilAttachment;
+
+const shadowPassDescriptor: GPURenderPassDescriptor = {
+    label: "shadow render pass",
+    colorAttachments: [],
+    depthStencilAttachment: shadowDepthStencilAttachment,
+    timestampWrites: shadowGPUTiming.timestampWrites,
+} as GPURenderPassDescriptor;
 
 const colorTargetAttachment: GPURenderPassColorAttachment = {
     label: "color target attachment",
@@ -300,9 +519,21 @@ const normalTargetAttachment: GPURenderPassColorAttachment = {
     storeOp: "store",
 } as GPURenderPassColorAttachment;
 
+const positionTargetAttachment: GPURenderPassColorAttachment = {
+    label: "position target attachment",
+    view: targetViews.position,
+    clearValue: [0, 0, 0, 1],
+    loadOp: "clear",
+    storeOp: "store",
+} as GPURenderPassColorAttachment;
+
 const targetPassDescriptor: GPURenderPassDescriptor = {
     label: "target render pass",
-    colorAttachments: [colorTargetAttachment, normalTargetAttachment],
+    colorAttachments: [
+        colorTargetAttachment,
+        normalTargetAttachment,
+        positionTargetAttachment,
+    ],
     depthStencilAttachment: depthStencilAttachment,
     timestampWrites: targetGPUTiming.timestampWrites,
 } as GPURenderPassDescriptor;
@@ -323,10 +554,24 @@ const deferredPassDescriptor: GPURenderPassDescriptor = {
 
 //////////// CREATE BUNDLE ////////////
 
+const shadowBundleEncoder: GPURenderBundleEncoder =
+    device.createRenderBundleEncoder({
+        label: "shadow bundle",
+        colorFormats: [],
+        depthStencilFormat: shadowFormat,
+    } as GPURenderBundleEncoderDescriptor);
+shadowBundleEncoder.setPipeline(shadowPipeline);
+shadowBundleEncoder.setBindGroup(0, shadowBindGroup);
+shadowBundleEncoder.setIndexBuffer(indexBuffer, "uint32");
+geometries.forEach((_geometry: OBJParseResult, i: int) => {
+    shadowBundleEncoder.drawIndexedIndirect(indirectBuffer, 20 * i);
+});
+const shadowBundle: GPURenderBundle = shadowBundleEncoder.finish();
+
 const targetBundleEncoder: GPURenderBundleEncoder =
     device.createRenderBundleEncoder({
         label: "target bundle",
-        colorFormats: [colorFormat, normalFormat],
+        colorFormats: [colorFormat, normalFormat, positionFormat],
         depthStencilFormat: depthFormat,
     } as GPURenderBundleEncoderDescriptor);
 targetBundleEncoder.setPipeline(targetPipeline);
@@ -366,6 +611,11 @@ async function frame(now: float): Promise<void> {
         label: "render command encoder",
     } as GPUObjectDescriptorBase);
 
+    const shadowPass: GPURenderPassEncoder =
+        renderEncoder.beginRenderPass(shadowPassDescriptor);
+    shadowPass.executeBundles([shadowBundle]);
+    shadowPass.end();
+
     const targetPass: GPURenderPassEncoder =
         renderEncoder.beginRenderPass(targetPassDescriptor);
     targetPass.executeBundles([targetBundle]);
@@ -377,6 +627,7 @@ async function frame(now: float): Promise<void> {
     deferredPass.executeBundles([deferredBundle]);
     deferredPass.end();
 
+    shadowGPUTiming.resolve(renderEncoder);
     targetGPUTiming.resolve(renderEncoder);
     deferredGPUTiming.resolve(renderEncoder);
 
@@ -391,6 +642,10 @@ async function frame(now: float): Promise<void> {
     stats.set("frame delta", now - stats.get("frame delta")!);
     frameDelta.sample(stats.get("frame delta")!);
 
+    shadowGPUTiming.readback((ms: float) => {
+        stats.set("gpu shadow delta", ms);
+        gpuShadowDelta.sample(ms);
+    });
     targetGPUTiming.readback((ms: float) => {
         stats.set("gpu target delta", ms);
         gpuTargetDelta.sample(ms);
@@ -399,7 +654,8 @@ async function frame(now: float): Promise<void> {
         stats.set("gpu deferred delta", ms);
         gpuDeferredDelta.sample(ms);
     });
-    const gpuDeltaSum: float = gpuTargetDelta.get() + gpuDeferredDelta.get();
+    const gpuDeltaSum: float =
+        gpuShadowDelta.get() + gpuTargetDelta.get() + gpuDeferredDelta.get();
 
     // prettier-ignore
     stats.update(`
@@ -411,6 +667,7 @@ async function frame(now: float): Promise<void> {
         <br>
         <b>gpu rate: ${(1_000 / gpuDeltaSum).toFixed(0)} fps</b><br>
         gpu delta: ${gpuDeltaSum.toFixed(2)} ms<br>
+         - shadow delta: ${gpuShadowDelta.get().toFixed(2)} ms<br>
          - target delta: ${gpuTargetDelta.get().toFixed(2)} ms<br>
          - deferred delta: ${gpuDeferredDelta.get().toFixed(2)} ms<br>
     `);

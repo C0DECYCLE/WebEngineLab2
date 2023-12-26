@@ -429,6 +429,23 @@ export class Mat4 {
         );
     }
 
+    public orthogonal(
+        left: float,
+        right: float,
+        top: float,
+        bottom: float,
+        near: float,
+        far: float,
+    ): Mat4 {
+        // prettier-ignore
+        return this.set(
+            2 / (right - left), 0, 0, 0,
+            0, 2 / (top - bottom), 0, 0,
+            0, 0, 1 / (near - far), 0,
+            (right + left) / (left - right), (top + bottom) / (bottom - top), near / (near - far), 1,
+        );
+    }
+
     public copy(mat: Mat4): Mat4 {
         return this.set(...mat.values);
     }
@@ -457,16 +474,6 @@ export class Mat4 {
         return new Mat4(this.isFloat64).copy(this);
     }
 
-    public static Perspective(
-        fov: float,
-        aspect: float,
-        near: float,
-        far: float,
-        isFloat64?: boolean,
-    ): Mat4 {
-        return new Mat4(isFloat64).perspective(fov, aspect, near, far);
-    }
-
     public static Aim(
         pos: Vec3,
         dir: Vec3,
@@ -483,5 +490,34 @@ export class Mat4 {
         isFloat64?: boolean,
     ): Mat4 {
         return new Mat4(isFloat64).view(pos, dir, up);
+    }
+
+    public static Perspective(
+        fov: float,
+        aspect: float,
+        near: float,
+        far: float,
+        isFloat64?: boolean,
+    ): Mat4 {
+        return new Mat4(isFloat64).perspective(fov, aspect, near, far);
+    }
+
+    public static Orthogonal(
+        left: float,
+        right: float,
+        top: float,
+        bottom: float,
+        near: float,
+        far: float,
+        isFloat64?: boolean,
+    ): Mat4 {
+        return new Mat4(isFloat64).orthogonal(
+            left,
+            right,
+            top,
+            bottom,
+            near,
+            far,
+        );
     }
 }
