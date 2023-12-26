@@ -116,7 +116,7 @@ struct Probe {
     let inverseShade: f32 = 1 - shade;
 
     let direct: vec3f = color * shade;
-    let indirect: vec3f = gi * inverseShade * 0.5;
+    let indirect: vec3f = gi * inverseShade * 0.35;
 
     return vec4f(direct + indirect, 1);
 }

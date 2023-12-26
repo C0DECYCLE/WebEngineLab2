@@ -79,6 +79,7 @@ const torus: OBJParseResult = await loadOBJ("./resources/torus.obj");
 const cylinder: OBJParseResult = await loadOBJ("./resources/cylinder.obj");
 const cone: OBJParseResult = await loadOBJ("./resources/cone.obj");
 const suzanne: OBJParseResult = await loadOBJ("./resources/suzanne.obj");
+const building: OBJParseResult = await loadOBJ("./resources/building.obj");
 
 const geometries: OBJParseResult[] = [
     cube,
@@ -87,6 +88,7 @@ const geometries: OBJParseResult[] = [
     cylinder,
     cone,
     suzanne,
+    building,
 ];
 
 //////////// SETUP UNIFORM ////////////
@@ -197,6 +199,13 @@ const entities: Entity[] = [
         geometryId: 5,
     } as Entity,
     {
+        position: new Vec3(-14, 0, -4),
+        scaling: new Vec3(2, 2, 2),
+        color: new Vec3(0.6, 0.7, 0.7),
+        geometryId: 6,
+    } as Entity,
+    /*
+    {
         position: new Vec3(-15, 6, -4),
         scaling: new Vec3(14, 12, 18),
         color: new Vec3(0.6, 0.7, 0.7),
@@ -214,9 +223,10 @@ const entities: Entity[] = [
         color: new Vec3(0.6, 0.7, 0.7),
         geometryId: 4,
     } as Entity,
+    */
 ];
 
-const debugProbes: boolean = false;
+const debugProbes: boolean = true;
 if (debugProbes) {
     for (let i: int = 0; i < probeCount; i++) {
         const position: Vec3 = new Vec3(
