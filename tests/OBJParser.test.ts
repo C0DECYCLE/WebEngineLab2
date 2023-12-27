@@ -29,7 +29,7 @@ describe("OBJParser", () => {
     test("parse", () => {
         expect(parser).not.toBeNull();
         const result: OBJParseResult = parser!.parse(raw);
-        const vertecies: Float32Array = result.positions;
+        const vertecies: Float32Array = result.vertices;
         expect(vertecies).toBeInstanceOf(Float32Array);
         expect(vertecies.toString()).toBe(parsedVerteciesUnindexed);
     });
@@ -37,7 +37,7 @@ describe("OBJParser", () => {
     test("parse indexed", () => {
         expect(parser).not.toBeNull();
         const result: OBJParseResult = parser!.parse(raw, true);
-        const vertecies: Float32Array = result.positions;
+        const vertecies: Float32Array = result.vertices;
         expect(vertecies).toBeInstanceOf(Float32Array);
         expect(vertecies.toString()).toBe(parsedVerteciesIndexed);
         const indices: Uint32Array = result.indices!;

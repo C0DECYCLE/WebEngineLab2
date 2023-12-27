@@ -26,13 +26,13 @@ export async function createCube(
 
     //////////// SETUP VERTECIES ////////////
 
-    const verteciesCount: int = data.positionsCount;
+    const verteciesCount: int = data.verticesCount;
     const verteciesBuffer: GPUBuffer = device.createBuffer({
         label: "cube vertex buffer",
-        size: data.positions.buffer.byteLength,
+        size: data.vertices.buffer.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     } as GPUBufferDescriptor);
-    device.queue.writeBuffer(verteciesBuffer, 0, data.positions.buffer);
+    device.queue.writeBuffer(verteciesBuffer, 0, data.vertices.buffer);
 
     log("cube vertecies", dotit(verteciesCount));
 

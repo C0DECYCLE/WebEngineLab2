@@ -13,6 +13,7 @@ struct Uniforms {
 
 struct Vertex {
     position: vec3f,
+    color: vec3f,
 };
 
 struct Instance {

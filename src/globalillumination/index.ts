@@ -73,12 +73,14 @@ const deferredGPUTiming: GPUTiming = new GPUTiming(device);
 
 //////////// LOAD OBJ ////////////
 
-const cube: OBJParseResult = await loadOBJ("./resources/cube.obj");
-const icosphere: OBJParseResult = await loadOBJ("./resources/icosphere.obj");
-const torus: OBJParseResult = await loadOBJ("./resources/torus.obj");
-const cylinder: OBJParseResult = await loadOBJ("./resources/cylinder.obj");
-const cone: OBJParseResult = await loadOBJ("./resources/cone.obj");
-const suzanne: OBJParseResult = await loadOBJ("./resources/suzanne.obj");
+const c: Vec3 = new Vec3(1, 1, 1);
+
+const cube: OBJParseResult = await loadOBJ("./resources/cube.obj", c);
+const icosphere: OBJParseResult = await loadOBJ("./resources/icosphere.obj", c);
+const torus: OBJParseResult = await loadOBJ("./resources/torus.obj", c);
+const cylinder: OBJParseResult = await loadOBJ("./resources/cylinder.obj", c);
+const cone: OBJParseResult = await loadOBJ("./resources/cone.obj", c);
+const suzanne: OBJParseResult = await loadOBJ("./resources/suzanne.obj", c);
 const building: OBJParseResult = await loadOBJ("./resources/building.obj");
 
 const geometries: OBJParseResult[] = [
@@ -90,6 +92,7 @@ const geometries: OBJParseResult[] = [
     suzanne,
     building,
 ];
+log(geometries);
 
 //////////// SETUP UNIFORM ////////////
 
@@ -109,7 +112,7 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformData);
 //////////// SETUP VERTICES ////////////
 
 const vertexData: Float32Array = new Float32Array(
-    geometries.flatMap((geometry: OBJParseResult) => [...geometry.positions]),
+    geometries.flatMap((geometry: OBJParseResult) => [...geometry.vertices]),
 );
 const vertexBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
@@ -117,7 +120,7 @@ const vertexBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-log("vertices", dotit(vertexData.length / 4));
+log("vertices", dotit(vertexData.length / 8));
 
 //////////// SETUP INDICES ////////////
 
@@ -201,29 +204,9 @@ const entities: Entity[] = [
     {
         position: new Vec3(-14, 0, -4),
         scaling: new Vec3(2, 2, 2),
-        color: new Vec3(0.6, 0.7, 0.7),
+        color: new Vec3(1, 1, 1),
         geometryId: 6,
     } as Entity,
-    /*
-    {
-        position: new Vec3(-15, 6, -4),
-        scaling: new Vec3(14, 12, 18),
-        color: new Vec3(0.6, 0.7, 0.7),
-        geometryId: 0,
-    } as Entity,
-    {
-        position: new Vec3(-8, 8, -13),
-        scaling: new Vec3(4, 8, 4),
-        color: new Vec3(0.6, 0.7, 0.7),
-        geometryId: 3,
-    } as Entity,
-    {
-        position: new Vec3(-8, 20, -13),
-        scaling: new Vec3(5, 4, 5),
-        color: new Vec3(0.6, 0.7, 0.7),
-        geometryId: 4,
-    } as Entity,
-    */
 ];
 
 const debugProbes: boolean = true;
@@ -290,7 +273,7 @@ geometries.forEach((geometry: OBJParseResult, i: int) => {
         5 * i,
     );
     totalIndices += geometry.indicesCount!;
-    totalPositions += geometry.positionsCount;
+    totalPositions += geometry.verticesCount;
     totalN += geometryCounts[i];
 });
 

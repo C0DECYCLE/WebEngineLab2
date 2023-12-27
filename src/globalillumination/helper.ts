@@ -5,6 +5,7 @@
 
 import { int } from "../../types/utilities/utils.type.js";
 import { OBJParseResult, OBJParser } from "../OBJParser.js";
+import { Vec3 } from "../utilities/Vec3.js";
 
 export const byteSize: int = 4;
 
@@ -27,6 +28,9 @@ export async function loadText(path: string): Promise<string> {
     );
 }
 
-export async function loadOBJ(path: string): Promise<OBJParseResult> {
-    return OBJParser.Standard.parse(await loadText(path), true);
+export async function loadOBJ(
+    path: string,
+    color?: Vec3,
+): Promise<OBJParseResult> {
+    return OBJParser.Standard.parse(await loadText(path), true, color);
 }

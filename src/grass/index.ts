@@ -239,7 +239,7 @@ const vertexCount: int = data.indices!.length;
 //log(parser.parse(raw));
 //log(parser.parse(raw, true));
 
-const vertexArrayBuffer: ArrayBuffer = data.positions.buffer;
+const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
 const verteciesBuffer: GPUBuffer = device.createBuffer({
     label: "vertices storage buffer",
     size: vertexArrayBuffer.byteLength,

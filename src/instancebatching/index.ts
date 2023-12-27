@@ -81,7 +81,7 @@ bytes += uniformBuffer.size;
 //////////// SETUP VERTICES ////////////
 
 const vertexData: Float32Array = new Float32Array(
-    geometries.flatMap((geometry: OBJParseResult) => [...geometry.positions]),
+    geometries.flatMap((geometry: OBJParseResult) => [...geometry.vertices]),
 );
 const vertexBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
@@ -145,7 +145,7 @@ geometries.forEach((geometry: OBJParseResult, i: int) => {
         5 * i,
     );
     totalIndices += geometry.indicesCount!;
-    totalPositions += geometry.positionsCount;
+    totalPositions += geometry.verticesCount;
 });
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",

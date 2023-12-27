@@ -13,6 +13,7 @@ struct Uniforms {
 
 struct Vertex {
     position: vec3f,
+    color: vec3f,
 };
 
 struct Instance {
@@ -43,7 +44,7 @@ struct FragmentOut {
     let position: vec3f = vertex.position * instance.scaling + instance.position;
     var out: VertexOut;
     out.position = uniforms.viewProjection * vec4f(position, 1);
-    out.color = instance.color;
+    out.color = vertex.color * instance.color;
     out.world = position;
     return out;
 }
