@@ -112,7 +112,7 @@ struct Probe {
     let lambert: f32 = max(0, theta);
     let halfLambert: f32 = pow(lambert * 0.5 + 0.5, 1);
 
-    let shade: f32 = lambert * visibility;
+    let shade: f32 = lambert * visibility * 0.9 + 0.1;
     let inverseShade: f32 = 1 - shade;
 
     let direct: vec3f = color * shade;

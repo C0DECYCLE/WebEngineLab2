@@ -41,7 +41,7 @@ const control: Controller = new Controller(canvas, camera);
 const shadowSize: int = 1024;
 const shadowBias: int = 0.005;
 const shadowRadius: float = 30;
-const lightDirection: Vec3 = new Vec3(0.27, -0.71, 0.35).normalize().scale(-1);
+const lightDirection: Vec3 = new Vec3(0.27, -0.71, -0.35).normalize().scale(-1);
 const lightViewProjection: Mat4 = new Mat4().multiply(
     Mat4.View(new Vec3(0, 0, 0), lightDirection, new Vec3(0, 1, 0)),
     Mat4.Orthogonal(
@@ -92,7 +92,6 @@ const geometries: OBJParseResult[] = [
     suzanne,
     building,
 ];
-log(geometries);
 
 //////////// SETUP UNIFORM ////////////
 
@@ -163,6 +162,7 @@ for (let y: int = 0; y < probeCountY; y++) {
             } else {
                 color.set(0.6, 0.7, 0.7);
             }
+            color.set(Math.random(), Math.random(), Math.random());
 
             position.store(probeData, i * probeLayout + 0 * vec3Layout);
             color.store(probeData, i * probeLayout + 1 * vec3Layout);

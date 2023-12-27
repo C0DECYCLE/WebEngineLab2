@@ -24,7 +24,7 @@ struct Instance {
 
 struct VertexOut {
     @builtin(position) position: vec4f,
-    @location(0) color: vec3f,
+    @interpolate(flat) @location(0) color: vec3f,
     @location(1) world: vec3f
 };
 
