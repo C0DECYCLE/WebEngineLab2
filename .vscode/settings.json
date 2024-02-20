@@ -1,0 +1,8 @@
+{
+    "liveServer.settings.https": {
+        "enable": true,
+        "cert": "/Users/noahmattiabussinger/Documents/Git/WebEngineLab2/.vscode/certificate/localhost.pem",
+        "key": "/Users/noahmattiabussinger/Documents/Git/WebEngineLab2/.vscode/certificate/localhost.key",
+        "passphrase": "test"
+    }
+}
