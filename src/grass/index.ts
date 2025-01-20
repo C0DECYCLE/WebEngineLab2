@@ -227,7 +227,7 @@ const timeOffset: int = 16;
 (window as any).setMode(2);
 */
 
-//////////// VERTECIES ////////////
+//////////// VERTICES ////////////
 
 const raw: string = await fetch("./resources/grass.obj").then(
     async (response: Response) => await response.text(),
@@ -240,7 +240,7 @@ const vertexCount: int = data.indices!.length;
 //log(parser.parse(raw, true));
 
 const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
-const verteciesBuffer: GPUBuffer = device.createBuffer({
+const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertices storage buffer",
     size: vertexArrayBuffer.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -254,7 +254,7 @@ const indicesBuffer: GPUBuffer = device.createBuffer({
 } as GPUBufferDescriptor);
 
 device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
-device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
+device.queue.writeBuffer(verticesBuffer, 0, vertexArrayBuffer);
 
 log(dotit(vertexCount));
 
@@ -351,7 +351,7 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
         } as GPUBindGroupEntry,
         {
             binding: 1,
-            resource: { buffer: verteciesBuffer } as GPUBindingResource,
+            resource: { buffer: verticesBuffer } as GPUBindingResource,
         } as GPUBindGroupEntry,
         {
             binding: 2,

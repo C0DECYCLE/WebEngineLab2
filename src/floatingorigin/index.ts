@@ -159,24 +159,24 @@ const uniformBuffer: GPUBuffer = device.createBuffer({
 
 device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
-//////////// VERTECIES INDICES ////////////
+//////////// VERTICES INDICES ////////////
 
 const raw: string = await fetch("./resources/cube.obj").then(
     async (response: Response) => await response.text(),
 );
 const parser: OBJParser = new OBJParser();
 const data: OBJParseResult = parser.parse(raw, true);
-const verteciesCount: int = data.verticesCount;
+const verticesCount: int = data.verticesCount;
 const indicesCount: int = data.indicesCount!;
 
 const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
-const verteciesBuffer: GPUBuffer = device.createBuffer({
+const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
     size: vertexArrayBuffer.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
+device.queue.writeBuffer(verticesBuffer, 0, vertexArrayBuffer);
 
 const indexArrayBuffer: ArrayBuffer = data.indices!.buffer;
 const indicesBuffer: GPUBuffer = device.createBuffer({
@@ -187,7 +187,7 @@ const indicesBuffer: GPUBuffer = device.createBuffer({
 
 device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
 
-log("vertecies", dotit(verteciesCount));
+log("vertices", dotit(verticesCount));
 log("indices", dotit(indicesCount));
 
 //////////// INSTANCES ////////////
@@ -251,7 +251,7 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
         } as GPUBindGroupEntry,
         {
             binding: 1,
-            resource: { buffer: verteciesBuffer } as GPUBindingResource,
+            resource: { buffer: verticesBuffer } as GPUBindingResource,
         } as GPUBindGroupEntry,
         {
             binding: 2,

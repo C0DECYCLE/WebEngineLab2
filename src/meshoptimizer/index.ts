@@ -164,31 +164,44 @@ const uniformBuffer: GPUBuffer = device.createBuffer({
 
 device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
-//////////// VERTECIES INDICES ////////////
+//////////// VERTICES INDICES ////////////
 
-const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
+const data: OBJParseResult = await loadOBJ("./resources/bakery.obj");
 
-log(data, MeshoptClusterizer);
+console.time("a");
 const a: Meshlet = MeshoptClusterizer.buildMeshlets(
     data.indices!,
     data.vertices,
     4,
-    128 * 3,
-    128,
+    255, //max verts
+    128, //max tris
 );
-log(a);
+console.timeEnd("a");
+log(data, a);
 
-const verteciesCount: int = data.verticesCount;
+for (let i: int = 0; i < a.meshletCount; i++) {
+    const vertexOffset: int = a.meshlets[i * 4 + 0];
+    const triangleOffset: int = a.meshlets[i * 4 + 1];
+    const triangleCount: int = a.meshlets[i * 4 + 3];
+
+    for (let j: int = 0; j < triangleCount * 3; j++) {
+        const k: int = triangleOffset + j;
+        const l: float = a.vertices[vertexOffset + a.triangles[k]];
+        data.vertices[l * 4 + 3] = i;
+    }
+}
+
+const verticesCount: int = data.verticesCount;
 const indicesCount: int = data.indicesCount!;
 
 const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
-const verteciesBuffer: GPUBuffer = device.createBuffer({
+const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
     size: vertexArrayBuffer.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-device.queue.writeBuffer(verteciesBuffer, 0, vertexArrayBuffer);
+device.queue.writeBuffer(verticesBuffer, 0, vertexArrayBuffer);
 
 const indexArrayBuffer: ArrayBuffer = data.indices!.buffer;
 const indicesBuffer: GPUBuffer = device.createBuffer({
@@ -199,7 +212,7 @@ const indicesBuffer: GPUBuffer = device.createBuffer({
 
 device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
 
-log("vertecies", dotit(verteciesCount));
+log("vertices", dotit(verticesCount));
 log("indices", dotit(indicesCount));
 
 //////////// INSTANCES ////////////
@@ -263,7 +276,7 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
         } as GPUBindGroupEntry,
         {
             binding: 1,
-            resource: { buffer: verteciesBuffer } as GPUBindingResource,
+            resource: { buffer: verticesBuffer } as GPUBindingResource,
         } as GPUBindGroupEntry,
         /*
         {

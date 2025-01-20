@@ -22,11 +22,11 @@ struct VertexShaderOut {
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var<storage, read> vertecies: array<Vertex>;
+@group(0) @binding(1) var<storage, read> vertices: array<Vertex>;
 @group(0) @binding(2) var<storage, read> instances: array<Instance>;
 
 @vertex fn vs(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) instanceIndex: u32) -> VertexShaderOut {
-    let vertex: Vertex = vertecies[vertexIndex];
+    let vertex: Vertex = vertices[vertexIndex];
     let instance: Instance = instances[instanceIndex];
 
     let position: vec3f = vertex.position + instance.position;

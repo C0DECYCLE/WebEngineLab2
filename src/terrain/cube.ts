@@ -24,17 +24,17 @@ export async function createCube(
     const parser: OBJParser = new OBJParser();
     const data: OBJParseResult = parser.parse(raw, true);
 
-    //////////// SETUP VERTECIES ////////////
+    //////////// SETUP VERTICES ////////////
 
-    const verteciesCount: int = data.verticesCount;
-    const verteciesBuffer: GPUBuffer = device.createBuffer({
+    const verticesCount: int = data.verticesCount;
+    const verticesBuffer: GPUBuffer = device.createBuffer({
         label: "cube vertex buffer",
         size: data.vertices.buffer.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     } as GPUBufferDescriptor);
-    device.queue.writeBuffer(verteciesBuffer, 0, data.vertices.buffer);
+    device.queue.writeBuffer(verticesBuffer, 0, data.vertices.buffer);
 
-    log("cube vertecies", dotit(verteciesCount));
+    log("cube vertices", dotit(verticesCount));
 
     //////////// SETUP INDICES ////////////
 
@@ -138,7 +138,7 @@ export async function createCube(
             } as GPUBindGroupEntry,
             {
                 binding: 1,
-                resource: { buffer: verteciesBuffer } as GPUBindingResource,
+                resource: { buffer: verticesBuffer } as GPUBindingResource,
             } as GPUBindGroupEntry,
             {
                 binding: 2,

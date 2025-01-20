@@ -34,17 +34,17 @@ export async function createTerrain(
 }> {
     const data: ChunkGeometryData = ChunkGeometry;
 
-    //////////// SETUP VERTECIES ////////////
+    //////////// SETUP VERTICES ////////////
 
-    const verteciesCount: int = data.positions.length / 4;
-    const verteciesBuffer: GPUBuffer = device.createBuffer({
+    const verticesCount: int = data.positions.length / 4;
+    const verticesBuffer: GPUBuffer = device.createBuffer({
         label: "terrain vertex buffer",
         size: data.positions.buffer.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     } as GPUBufferDescriptor);
-    device.queue.writeBuffer(verteciesBuffer, 0, data.positions.buffer);
+    device.queue.writeBuffer(verticesBuffer, 0, data.positions.buffer);
 
-    log("terrain vertecies", dotit(verteciesCount));
+    log("terrain vertices", dotit(verticesCount));
 
     //////////// SETUP INDICES ////////////
 
@@ -134,7 +134,7 @@ export async function createTerrain(
             } as GPUBindGroupEntry,
             {
                 binding: 1,
-                resource: { buffer: verteciesBuffer } as GPUBindingResource,
+                resource: { buffer: verticesBuffer } as GPUBindingResource,
             } as GPUBindGroupEntry,
             {
                 binding: 2,
