@@ -276,7 +276,7 @@ async function frame(now: float): Promise<void> {
     //////////// RENDER FRAME ////////////
 
     colorAttachment.view = context!.getCurrentTexture().createView();
-    depthStencilAttachment.view = depthTexture.createView();
+    //depthStencilAttachment.view = depthTexture.createView();
 
     const renderEncoder: GPUCommandEncoder = device!.createCommandEncoder({
         label: "render command encoder",
