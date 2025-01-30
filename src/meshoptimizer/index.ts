@@ -20,6 +20,7 @@ import { RollingAverage } from "../RollingAverage.js";
 import {
     Meshlet,
     MeshoptClusterizer,
+    // @ts-ignore
 } from "../../../node_modules/meshoptimizer/meshopt_clusterizer.module.js";
 import { loadOBJ } from "../instancebatching/helper.js";
 
@@ -166,7 +167,7 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
 //////////// VERTICES INDICES ////////////
 
-const data: OBJParseResult = await loadOBJ("./resources/bakery.obj");
+const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
 
 console.time("a");
 const a: Meshlet = MeshoptClusterizer.buildMeshlets(
@@ -179,6 +180,9 @@ const a: Meshlet = MeshoptClusterizer.buildMeshlets(
 console.timeEnd("a");
 log(data, a);
 
+const verticesCount: int = a.meshletCount * 128 * 3;
+const verticesData: Float32Array = new Float32Array(verticesCount * 4);
+
 for (let i: int = 0; i < a.meshletCount; i++) {
     const vertexOffset: int = a.meshlets[i * 4 + 0];
     const triangleOffset: int = a.meshlets[i * 4 + 1];
@@ -187,14 +191,13 @@ for (let i: int = 0; i < a.meshletCount; i++) {
     for (let j: int = 0; j < triangleCount * 3; j++) {
         const k: int = triangleOffset + j;
         const l: float = a.vertices[vertexOffset + a.triangles[k]];
-        data.vertices[l * 4 + 3] = i;
+        verticesData[(i * 128 * 3 + j) * 4 + 0] = data.vertices[l * 4 + 0];
+        verticesData[(i * 128 * 3 + j) * 4 + 1] = data.vertices[l * 4 + 1];
+        verticesData[(i * 128 * 3 + j) * 4 + 2] = data.vertices[l * 4 + 2];
     }
 }
 
-const verticesCount: int = data.verticesCount;
-const indicesCount: int = data.indicesCount!;
-
-const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
+const vertexArrayBuffer: ArrayBuffer = verticesData.buffer;
 const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
     size: vertexArrayBuffer.byteLength,
@@ -203,17 +206,7 @@ const verticesBuffer: GPUBuffer = device.createBuffer({
 
 device.queue.writeBuffer(verticesBuffer, 0, vertexArrayBuffer);
 
-const indexArrayBuffer: ArrayBuffer = data.indices!.buffer;
-const indicesBuffer: GPUBuffer = device.createBuffer({
-    label: "index buffer",
-    size: indexArrayBuffer.byteLength,
-    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-} as GPUBufferDescriptor);
-
-device.queue.writeBuffer(indicesBuffer, 0, indexArrayBuffer);
-
 log("vertices", dotit(verticesCount));
-log("indices", dotit(indicesCount));
 
 //////////// INSTANCES ////////////
 /*
@@ -239,9 +232,8 @@ log("instances", dotit(instanceCount));
 //////////// INDIRECT ////////////
 
 const indirectData: Uint32Array = new Uint32Array([
-    indicesCount, //aka indexCount
-    1, //instanceCount,
-    0,
+    128 * 3, //aka indexCount
+    a.meshletCount, //instanceCount,
     0,
     0,
 ]);
@@ -249,7 +241,7 @@ const indirectData: Uint32Array = new Uint32Array([
 const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
-    size: 5 * byteSize,
+    size: 4 * byteSize,
     usage:
         GPUBufferUsage.INDIRECT |
         GPUBufferUsage.STORAGE |
@@ -334,8 +326,7 @@ const renderBundleEncoder: GPURenderBundleEncoder =
 
 renderBundleEncoder.setPipeline(renderPipeline);
 renderBundleEncoder.setBindGroup(0, renderBindGroup);
-renderBundleEncoder.setIndexBuffer(indicesBuffer, "uint32");
-renderBundleEncoder.drawIndexedIndirect(indirectBuffer, 0);
+renderBundleEncoder.drawIndirect(indirectBuffer, 0);
 
 const renderBundle: GPURenderBundle = renderBundleEncoder.finish();
 
