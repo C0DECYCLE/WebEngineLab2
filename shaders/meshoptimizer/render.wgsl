@@ -1,18 +1,25 @@
 /**
  * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger, October 2023
+ * Written by Noah Mattia Bussinger, January 2025
  */
 
 struct Uniforms {
     viewProjection: mat4x4f,
 };
 
-struct Vertex {
-    position: vec3f,
+struct Task {
+    instanceIndex: u32,
+    meshletIndex: u32,
 };
 
 struct Instance {
-    position: vec3f
+    position: vec3f,
+    meshletsOffset: u32,
+    meshletsCount: u32,
+};
+
+struct Vertex {
+    position: vec3f,
 };
 
 struct VertexShaderOut {
@@ -22,18 +29,20 @@ struct VertexShaderOut {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> vertices: array<Vertex>;
-//@group(0) @binding(2) var<storage, read> instances: array<Instance>;
+@group(0) @binding(2) var<storage, read> instances: array<Instance>;
+@group(0) @binding(3) var<storage, read> tasks: array<Task>;
 
 @vertex fn vs(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) instanceIndex: u32) -> VertexShaderOut {
-    let vertex: Vertex = vertices[instanceIndex * 128 * 3 + vertexIndex];
-    //let instance: Instance = instances[instanceIndex];
+    let task: Task = tasks[instanceIndex];
+    let instance: Instance = instances[task.instanceIndex];
+    let vertex: Vertex = vertices[task.meshletIndex * 128 * 3 + vertexIndex];
 
     var position: vec3f = vertex.position;
-    //position += instance.position;
+    position += instance.position;
     
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1);
-    out.color = vec4f(rndColor(f32(instanceIndex)), 1);
+    out.color = vec4f(rndColor(f32(task.instanceIndex + task.meshletIndex + vertexIndex)), 1);
     return out;
 }
 
