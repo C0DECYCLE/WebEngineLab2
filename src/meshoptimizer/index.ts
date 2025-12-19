@@ -41,7 +41,7 @@ function createCanvas(): HTMLCanvasElement {
 const canvas: HTMLCanvasElement = createCanvas();
 const adapter: Nullable<GPUAdapter> = await navigator.gpu?.requestAdapter();
 const device: Undefinable<GPUDevice> = await adapter?.requestDevice({
-    requiredFeatures: ["timestamp-query"],
+    requiredFeatures: ["timestamp-query", "primitive-index"],
 } as GPUDeviceDescriptor);
 const context: Nullable<GPUCanvasContext> = canvas.getContext("webgpu");
 if (!device || !context) {
@@ -139,7 +139,7 @@ const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
 const colorAttachment: GPURenderPassColorAttachment = {
     label: "color attachment",
     view: context!.getCurrentTexture().createView(),
-    clearValue: [0.3, 0.3, 0.3, 1],
+    clearValue: [1, 1, 1, 1],
     loadOp: "clear",
     storeOp: "store",
 } as GPURenderPassColorAttachment;
@@ -172,7 +172,7 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
 const uniformFloats: int = 4 * 4;
 const uniformData: Float32Array = new Float32Array(uniformFloats);
 
-const uniformArrayBuffer: ArrayBuffer = uniformData.buffer;
+const uniformArrayBuffer: ArrayBufferLike = uniformData.buffer;
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
     size: uniformArrayBuffer.byteLength,
@@ -217,7 +217,7 @@ for (let i: int = 0; i < meshletsCount; i++) {
     }
 }
 
-const vertexArrayBuffer: ArrayBuffer = verticesData.buffer;
+const vertexArrayBuffer: ArrayBufferLike = verticesData.buffer;
 const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
     size: vertexArrayBuffer.byteLength,
@@ -247,7 +247,7 @@ for (let i: int = 0; i < instanceCount; i++) {
     uIntView[i * instanceStride + 4] = meshletsCount;
 }
 
-const instancesArrayBuffer: ArrayBuffer = instancesData.buffer;
+const instancesArrayBuffer: ArrayBufferLike = instancesData.buffer;
 const instancesBuffer: GPUBuffer = device.createBuffer({
     label: "instances buffer",
     size: instancesArrayBuffer.byteLength,
@@ -273,7 +273,7 @@ const indirectData: Uint32Array = new Uint32Array([
     0,
     0,
 ]);
-const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
+const indirectArrayBuffer: ArrayBufferLike = indirectData.buffer;
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
     size: 4 * byteSize,

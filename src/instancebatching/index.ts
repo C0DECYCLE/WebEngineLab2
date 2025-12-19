@@ -88,7 +88,7 @@ const vertexBuffer: GPUBuffer = device.createBuffer({
     size: vertexData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+device.queue.writeBuffer(vertexBuffer, 0, vertexData.buffer);
 log("vertices", vertexData.length / 4);
 bytes += vertexBuffer.size;
 
@@ -102,7 +102,7 @@ const indexBuffer: GPUBuffer = device.createBuffer({
     size: indexData.byteLength,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(indexBuffer, 0, indexData);
+device.queue.writeBuffer(indexBuffer, 0, indexData.buffer);
 log("indices", indexData.length);
 bytes += indexBuffer.size;
 
@@ -130,7 +130,7 @@ const instanceBuffer: GPUBuffer = device.createBuffer({
     size: instanceData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(instanceBuffer, 0, instanceData);
+device.queue.writeBuffer(instanceBuffer, 0, instanceData.buffer);
 log("instances", dotit(n), dotit(count));
 bytes += instanceBuffer.size;
 
@@ -156,7 +156,7 @@ const indirectBuffer: GPUBuffer = device.createBuffer({
         GPUBufferUsage.COPY_SRC |
         GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(indirectBuffer, 0, indirectData);
+device.queue.writeBuffer(indirectBuffer, 0, indirectData.buffer);
 bytes += indirectBuffer.size;
 
 log("vram", dotit(bytes));
@@ -271,7 +271,7 @@ async function frame(now: float): Promise<void> {
 
     control.update();
     camera.update().store(uniformData, 0);
-    device!.queue.writeBuffer(uniformBuffer, 0, uniformData);
+    device!.queue.writeBuffer(uniformBuffer, 0, uniformData.buffer);
 
     //////////// RENDER FRAME ////////////
 

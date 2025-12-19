@@ -106,7 +106,7 @@ const uniformBuffer: GPUBuffer = device.createBuffer({
 lightDirection.store(uniformData, 16);
 lightViewProjection.store(uniformData, 20);
 uniformData.set([shadowSize, shadowBias], 36);
-device!.queue.writeBuffer(uniformBuffer, 0, uniformData);
+device!.queue.writeBuffer(uniformBuffer, 0, uniformData.buffer);
 
 //////////// SETUP VERTICES ////////////
 
@@ -118,7 +118,7 @@ const vertexBuffer: GPUBuffer = device.createBuffer({
     size: vertexData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+device.queue.writeBuffer(vertexBuffer, 0, vertexData.buffer);
 log("vertices", dotit(vertexData.length / 8));
 
 //////////// SETUP INDICES ////////////
@@ -131,7 +131,7 @@ const indexBuffer: GPUBuffer = device.createBuffer({
     size: indexData.byteLength,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(indexBuffer, 0, indexData);
+device.queue.writeBuffer(indexBuffer, 0, indexData.buffer);
 log("indices", dotit(indexData.length));
 
 //////////// SETUP PROBES ////////////
@@ -176,7 +176,7 @@ const probeBuffer: GPUBuffer = device.createBuffer({
     size: probeData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(probeBuffer, 0, probeData);
+device.queue.writeBuffer(probeBuffer, 0, probeData.buffer);
 log("probes", dotit(probeCount));
 
 //////////// SETUP INSTANCES ////////////
@@ -251,7 +251,7 @@ const instanceBuffer: GPUBuffer = device.createBuffer({
     size: instanceData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(instanceBuffer, 0, instanceData);
+device.queue.writeBuffer(instanceBuffer, 0, instanceData.buffer);
 log("instances/entities", dotit(entityCount));
 
 //////////// SETUP INDIRECTS ////////////
@@ -286,7 +286,7 @@ const indirectBuffer: GPUBuffer = device.createBuffer({
         GPUBufferUsage.COPY_SRC |
         GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
-device.queue.writeBuffer(indirectBuffer, 0, indirectData);
+device.queue.writeBuffer(indirectBuffer, 0, indirectData.buffer);
 
 //////////// LOAD SHADER ////////////
 
@@ -611,7 +611,7 @@ async function frame(now: float): Promise<void> {
 
     control.update();
     camera.update().store(uniformData, 0);
-    device!.queue.writeBuffer(uniformBuffer, 0, uniformData);
+    device!.queue.writeBuffer(uniformBuffer, 0, uniformData.buffer);
 
     //////////// RENDER FRAME ////////////
 

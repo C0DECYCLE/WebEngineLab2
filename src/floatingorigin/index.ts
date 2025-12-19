@@ -150,7 +150,7 @@ const renderPassDescriptor: GPURenderPassDescriptor = {
 const uniformFloats: int = 4 * 4;
 const uniformData: Float32Array = new Float32Array(uniformFloats);
 
-const uniformArrayBuffer: ArrayBuffer = uniformData.buffer;
+const uniformArrayBuffer: ArrayBufferLike = uniformData.buffer;
 const uniformBuffer: GPUBuffer = device.createBuffer({
     label: "uniforms uniform buffer",
     size: uniformArrayBuffer.byteLength,
@@ -169,7 +169,7 @@ const data: OBJParseResult = parser.parse(raw, true);
 const verticesCount: int = data.verticesCount;
 const indicesCount: int = data.indicesCount!;
 
-const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
+const vertexArrayBuffer: ArrayBufferLike = data.vertices.buffer;
 const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertex buffer",
     size: vertexArrayBuffer.byteLength,
@@ -178,7 +178,7 @@ const verticesBuffer: GPUBuffer = device.createBuffer({
 
 device.queue.writeBuffer(verticesBuffer, 0, vertexArrayBuffer);
 
-const indexArrayBuffer: ArrayBuffer = data.indices!.buffer;
+const indexArrayBuffer: ArrayBufferLike = data.indices!.buffer;
 const indicesBuffer: GPUBuffer = device.createBuffer({
     label: "index buffer",
     size: indexArrayBuffer.byteLength,
@@ -200,7 +200,7 @@ const instancesData: Float32Array = new Float32Array(
 
 new Vec3(0, 0, 0).store(instancesData, 0 * instanceFloats);
 
-const instancesArrayBuffer: ArrayBuffer = instancesData.buffer;
+const instancesArrayBuffer: ArrayBufferLike = instancesData.buffer;
 const instancesBuffer: GPUBuffer = device.createBuffer({
     label: "instances buffer",
     size: instancesArrayBuffer.byteLength,
@@ -221,7 +221,7 @@ const indirectData: Uint32Array = new Uint32Array([
     0,
 ]);
 
-const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
+const indirectArrayBuffer: ArrayBufferLike = indirectData.buffer;
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
     size: 5 * byteSize,

@@ -239,14 +239,14 @@ const vertexCount: int = data.indices!.length;
 //log(parser.parse(raw));
 //log(parser.parse(raw, true));
 
-const vertexArrayBuffer: ArrayBuffer = data.vertices.buffer;
+const vertexArrayBuffer: ArrayBufferLike = data.vertices.buffer;
 const verticesBuffer: GPUBuffer = device.createBuffer({
     label: "vertices storage buffer",
     size: vertexArrayBuffer.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 } as GPUBufferDescriptor);
 
-const indexArrayBuffer: ArrayBuffer = data.indices!.buffer;
+const indexArrayBuffer: ArrayBufferLike = data.indices!.buffer;
 const indicesBuffer: GPUBuffer = device.createBuffer({
     label: "index buffer",
     size: indexArrayBuffer.byteLength,
@@ -287,7 +287,7 @@ const indirectData: Uint32Array = new Uint32Array([
     0,
 ]);
 
-const indirectArrayBuffer: ArrayBuffer = indirectData.buffer;
+const indirectArrayBuffer: ArrayBufferLike = indirectData.buffer;
 const indirectBuffer: GPUBuffer = device.createBuffer({
     label: "indirect buffer",
     size: 5 * byteSize,

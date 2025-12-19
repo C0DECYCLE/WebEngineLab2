@@ -80,3 +80,11 @@ export function assert(condition: any, msg?: string): asserts condition {
         throw new Error(msg);
     }
 }
+
+export async function loadText(path: string): Promise<string> {
+    return await (await fetch(path)).text();
+}
+
+export function sum<T extends int | float>(value: T[]): T {
+    return value.reduce((result: T, v: T) => (result + v) as T, 0 as T);
+}

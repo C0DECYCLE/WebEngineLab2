@@ -2,6 +2,7 @@
  * Copyright (C) - All Rights Reserved
  * Written by Noah Mattia Bussinger, January 2025
  */
+enable primitive_index;
 
 struct Uniforms {
     viewProjection: mat4x4f,
@@ -24,7 +25,7 @@ struct Vertex {
 
 struct VertexShaderOut {
     @builtin(position) position: vec4f,
-    @interpolate(flat) @location(0) color: vec4f,
+    @interpolate(flat) @location(0) index: u32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -42,14 +43,14 @@ struct VertexShaderOut {
     
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1);
-    out.color = vec4f(rndColor(f32(task.instanceIndex + task.meshletIndex + vertexIndex)), 1);
+    out.index = task.instanceIndex * 1 + task.meshletIndex * 1;
     return out;
 }
 
-@fragment fn fs(in: VertexShaderOut) -> @location(0) vec4f {
-    return in.color;
+@fragment fn fs(@builtin(primitive_index) primitiveIndex: u32, @interpolate(flat) @location(0) index: u32) -> @location(0) vec4f {
+    return vec4f(random(f32(index + primitiveIndex * 0)), 1);
 }
 
-fn rndColor(value: f32) -> vec3f {
+fn random(value: f32) -> vec3f {
     return fract(vec3f(value * 0.1443, value * 0.6841, value * 0.7323)) * 0.75 + 0.25;
 }
