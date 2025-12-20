@@ -8,7 +8,7 @@ struct Operation {
 }
 
 struct Queue {
-    ringbuffer: array<atomic<u32>, 65536>, //33554432
+    ringbuffer: array<u32, 65536>, //33554432
     tickets: array<atomic<u32>, 65536>, //33554432
     head: atomic<u32>, // should start 0
     tail: atomic<u32>, // should start 1
@@ -118,14 +118,23 @@ override WORKGROUP_SIZE_1D: u32;
     @builtin(global_invocation_id) globalInvocationId: vec3u
 ) {
     let index: u32 = globalInvocationId.x;
-    loop {
+    /*
+    //loop {
         if (index == 0) {
             for (var i: u32 = 0; i < operation.initial; i++) {
                 enqueue(i * 2);
             }
         }
-        storageBarrier();
-        workgroupBarrier();
-        break;
+        data[0] = data[0];
+        //storageBarrier();
+        //workgroupBarrier();
+        //break;
+    //}
+    */
+    if (index == 0) {
+        enqueue(0);
+        enqueue(2);
+        enqueue(4);
+        enqueue(6);
     }
 }

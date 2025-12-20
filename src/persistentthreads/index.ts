@@ -252,7 +252,8 @@ const persistentPass: GPUComputePassEncoder = encoder.beginComputePass({
 });
 persistentPass.setPipeline(persistentPipeline);
 persistentPass.setBindGroup(0, persistentBindGroup);
-persistentPass.dispatchWorkgroups(Math.max(1, Math.ceil(1 / WorkGroupSize1D)));
+const count: int = Math.ceil(1048576 / WorkGroupSize1D);
+persistentPass.dispatchWorkgroups(Math.max(1, count));
 persistentPass.end();
 
 encoder.copyBufferToBuffer(
@@ -311,6 +312,6 @@ const persistentData: Uint32Array = new Uint32Array(
 );
 //verify(persistentData, simulationData);
 log("Persistent data", persistentData);
-//output(persistentData, true);
+output(persistentData, true);
 
 log("----------------------------------------------------");
