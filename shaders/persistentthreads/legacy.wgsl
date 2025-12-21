@@ -8,10 +8,10 @@ struct Operation {
     length: u32,
 }
 
+override WORKGROUP_SIZE_1D: u32;
+
 @group(0) @binding(0) var<storage, read_write> data: array<u32>;
 @group(1) @binding(0) var<storage, read> operation: Operation;
-
-override WORKGROUP_SIZE_1D: u32;
 
 @compute @workgroup_size(WORKGROUP_SIZE_1D) fn cs(
     @builtin(global_invocation_id) globalInvocationId: vec3u

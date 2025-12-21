@@ -10,7 +10,8 @@ import { InputLayerCount, InputMax, InputSize } from "./index.js";
 
 export function populate(empty: Uint32Array): void {
     for (let i: int = 0; i < InputSize; i++) {
-        empty[i] = Math.floor(Math.random() * InputMax);
+        //don't allow zero to avoid workaround in persistent thread
+        empty[i] = Math.floor(Math.random() * (InputMax - 1)) + 1;
     }
 }
 

@@ -23,6 +23,9 @@ export const Bytes64: int = 8;
 export const QueryStride: int = 2;
 export const QueryCapacity: int = 2;
 
+export const PersistentThreads: int = 1048576; //16384 * 64
+export const PersistentQueueSize: int = 1024; //65536 sync with shader later override
+
 export const WorkGroupSize1D: int = 64;
 
 export const MsToNanos: int = 1_000_000;
@@ -108,30 +111,19 @@ device.queue.writeBuffer(
     0 * Bytes32,
     InputSize * Bytes32,
 );
-const persistentOperationBuffer: GPUBuffer = device.createBuffer({
-    size: 1 * Bytes32,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-});
-device.queue.writeBuffer(
-    persistentOperationBuffer,
-    0 * Bytes32,
-    new Uint32Array([InputSize / 2]).buffer,
-    0 * Bytes32,
-    1 * Bytes32,
-);
 const persistentQueueBuffer: GPUBuffer = device.createBuffer({
-    size: (65536 * 2 + 3) * Bytes32,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    size: (3 + 2 * PersistentQueueSize) * Bytes32,
+    usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_SRC |
+        GPUBufferUsage.COPY_DST,
 });
-device.queue.writeBuffer(
-    persistentQueueBuffer,
-    65536 * 2 * Bytes32,
-    new Uint32Array([0, 1, 1]).buffer,
-    0 * Bytes32,
-    3 * Bytes32,
-);
 const persistentReadbackBuffer: GPUBuffer = device.createBuffer({
     size: InputSize * 2 * Bytes32,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+});
+const persistentQueueReadbackBuffer: GPUBuffer = device.createBuffer({
+    size: (3 + 2 * PersistentQueueSize) * Bytes32,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
 
@@ -186,6 +178,8 @@ const persistentPipeline: GPUComputePipeline =
             entryPoint: "cs",
             constants: {
                 WORKGROUP_SIZE_1D: WorkGroupSize1D,
+                //QUEUE_SIZE: PersistentQueueSize,
+                INPUT_SIZE: InputSize,
             },
         },
     });
@@ -209,8 +203,7 @@ const persistentBindGroup: GPUBindGroup = device.createBindGroup({
     layout: persistentPipeline.getBindGroupLayout(0),
     entries: [
         { binding: 0, resource: persistentDataBuffer },
-        { binding: 1, resource: persistentOperationBuffer },
-        { binding: 2, resource: persistentQueueBuffer },
+        { binding: 1, resource: persistentQueueBuffer },
     ],
 });
 
@@ -252,7 +245,7 @@ const persistentPass: GPUComputePassEncoder = encoder.beginComputePass({
 });
 persistentPass.setPipeline(persistentPipeline);
 persistentPass.setBindGroup(0, persistentBindGroup);
-const count: int = Math.ceil(1048576 / WorkGroupSize1D);
+const count: int = Math.ceil(PersistentThreads / WorkGroupSize1D);
 persistentPass.dispatchWorkgroups(Math.max(1, count));
 persistentPass.end();
 
@@ -262,6 +255,13 @@ encoder.copyBufferToBuffer(
     persistentReadbackBuffer,
     0 * Bytes32,
     InputSize * 2 * Bytes32,
+);
+encoder.copyBufferToBuffer(
+    persistentQueueBuffer,
+    0 * Bytes32,
+    persistentQueueReadbackBuffer,
+    0 * Bytes32,
+    (3 + 2 * PersistentQueueSize) * Bytes32,
 );
 
 encoder.resolveQuerySet(
@@ -313,5 +313,11 @@ const persistentData: Uint32Array = new Uint32Array(
 //verify(persistentData, simulationData);
 log("Persistent data", persistentData);
 output(persistentData, true);
+
+await persistentQueueReadbackBuffer.mapAsync(GPUMapMode.READ);
+const persistentQueue: Uint32Array = new Uint32Array(
+    persistentQueueReadbackBuffer.getMappedRange(),
+);
+log("Persistent queue", persistentQueue);
 
 log("----------------------------------------------------");
