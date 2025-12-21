@@ -59,9 +59,9 @@ override INPUT_SIZE: u32;
     let workgroupCount: u32 = numWorkgroups.x;
     let index: u32 = globalInvocationId.x;
 
+    // enqueue initial tasks
     if (workgroupCount == 1) {
         if (index == 0) {
-            // initial
             for (var i: u32 = 0; i < INPUT_SIZE / 2; i++) {
                 enqueue(INPUT_SIZE + i);
             }
@@ -69,16 +69,20 @@ override INPUT_SIZE: u32;
         return;
     }
 
+    // persistent thread
     for (var l: u32 = 0; l < QUEUE_FAILURE; l++) {
 
         var current: u32;
 
+        // try to get work
         if (dequeue(&current)) {
 
+            // do work
             let a: u32 = data[current * 2 - (INPUT_SIZE * 2)];
             let b: u32 = data[current * 2 - (INPUT_SIZE * 2) + 1];
             data[current] = a + b;
 
+            // push new work
             if (current % 2 == 0 && data[current + 1] != 0) {
                 let next: u32 = (current + (INPUT_SIZE * 2)) / 2;
 
@@ -102,11 +106,12 @@ override INPUT_SIZE: u32;
             
         } else {
     
+            // terminate if no work and none working
             if (atomicLoad(&queue.activeCount) == 0) {
                 break;
             }
             
-            // Optional: small yield/spin to reduce contention
+            // optional small yield/spin to reduce contention
             var dummy: u32 = 0;
             for (var i: u32 = 0; i < 100; i++) {
                 dummy += i;
