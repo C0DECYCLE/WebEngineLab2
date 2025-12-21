@@ -1,8 +1,3 @@
-/**
- * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger
- */
-
 const QUEUE_SIZE: u32 = 1024;
 const QUEUE_MASK: u32 = QUEUE_SIZE - 1;
 const QUEUE_FAILURE: u32 = 4294967295;

@@ -1,8 +1,3 @@
-/**
- * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger
- */
-
 import { log } from "../utilities/logger.js";
 import { assert, loadText, sum } from "../utilities/utils.js";
 import { float, int, Nullable } from "../utilities/utils.type.js";
