@@ -10,6 +10,7 @@ struct Queue {
 }
 
 fn enqueue(value: u32) -> bool {
+    // bad, obviously race conditions    
     let h: u32 = atomicLoad(&queue.head);
     let t: u32 = atomicLoad(&queue.tail);
     if (h - t >= QUEUE_SIZE) { 
@@ -28,6 +29,7 @@ fn dequeue(value: ptr<function, u32>) -> bool {
     if (atomicLoad(&queue.activeCount) == 0) {
         return false;
     }
+    // bad, obviously race conditions    
     let t: u32 = atomicLoad(&queue.tail);
     let h: u32 = atomicLoad(&queue.head);
     if (t >= h) {
