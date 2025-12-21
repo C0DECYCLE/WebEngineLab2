@@ -23,7 +23,7 @@ export const Bytes64: int = 8;
 export const QueryStride: int = 2;
 export const QueryCapacity: int = 2;
 
-export const PersistentThreads: int = 1048576; //16384 * 64
+export const PersistentThreads: int = 16384 * 64; //1048576 16384 * 64
 export const PersistentQueueSize: int = 1024; //65536 sync with shader later override
 
 export const WorkGroupSize1D: int = 64;
@@ -112,7 +112,7 @@ device.queue.writeBuffer(
     InputSize * Bytes32,
 );
 const persistentQueueBuffer: GPUBuffer = device.createBuffer({
-    size: (3 + 2 * PersistentQueueSize) * Bytes32,
+    size: (3 + PersistentQueueSize) * Bytes32,
     usage:
         GPUBufferUsage.STORAGE |
         GPUBufferUsage.COPY_SRC |
@@ -123,7 +123,7 @@ const persistentReadbackBuffer: GPUBuffer = device.createBuffer({
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
 const persistentQueueReadbackBuffer: GPUBuffer = device.createBuffer({
-    size: (3 + 2 * PersistentQueueSize) * Bytes32,
+    size: (3 + PersistentQueueSize) * Bytes32,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
 
@@ -236,6 +236,12 @@ encoder.copyBufferToBuffer(
     InputSize * 2 * Bytes32,
 );
 
+const persistentPrePass: GPUComputePassEncoder = encoder.beginComputePass({});
+persistentPrePass.setPipeline(persistentPipeline);
+persistentPrePass.setBindGroup(0, persistentBindGroup);
+persistentPrePass.dispatchWorkgroups(1);
+persistentPrePass.end();
+
 const persistentPass: GPUComputePassEncoder = encoder.beginComputePass({
     timestampWrites: {
         querySet: querySet,
@@ -261,7 +267,7 @@ encoder.copyBufferToBuffer(
     0 * Bytes32,
     persistentQueueReadbackBuffer,
     0 * Bytes32,
-    (3 + 2 * PersistentQueueSize) * Bytes32,
+    (3 + PersistentQueueSize) * Bytes32,
 );
 
 encoder.resolveQuerySet(
