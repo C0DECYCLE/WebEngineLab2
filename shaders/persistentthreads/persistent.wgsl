@@ -1,46 +1,120 @@
-const QUEUE_SIZE: u32 = 1024;
-const QUEUE_MASK: u32 = QUEUE_SIZE - 1;
+const THREAD_COUNT: u32 = 16384 * 64;
+
+const QUEUE_SIZE: u32 = 65536;
 const QUEUE_FAILURE: u32 = 4294967295;
+
+const LOOP_LIMIT: u32 = 1024;
 
 struct Queue {
     head: atomic<u32>,
     tail: atomic<u32>,
-    activeCount: atomic<u32>,
-    data: array<u32, QUEUE_SIZE>,
+    count: atomic<i32>,
+    ringbuffer: array<u32/*atomic<u32>*/, QUEUE_SIZE>,
+    tickets: array<atomic<u32>, QUEUE_SIZE>,
+    //
+    workLeft: atomic<u32>,
 }
 
-// bad
-fn enqueue(value: u32) -> bool {
-    let h: u32 = atomicLoad(&queue.head);
-    let t: u32 = atomicLoad(&queue.tail);
-    if (h - t >= QUEUE_SIZE) { 
-        return false; 
+fn ensureEnqueue() -> bool {
+    var num: i32 = atomicLoad(&queue.count);
+    var ensurance: bool = false;
+
+    //loop {
+    for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
+        if (ensurance || num >= i32(QUEUE_SIZE)) {
+            break;
+        }
+        ensurance = atomicAdd(&queue.count, 1) < i32(QUEUE_SIZE);
+        if (!ensurance) {
+            num = atomicSub(&queue.count, 1) - 1;
+        }
     }
-    let res = atomicCompareExchangeWeak(&queue.head, h, h + 1);
-    if (!res.exchanged) {
-        return false;
+    return ensurance;
+}
+
+fn ensureDequeue() -> bool {
+    var num: i32 = atomicLoad(&queue.count);
+    var ensurance: bool = false;
+
+    //loop {
+    for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
+        if (ensurance || num <= 0) {
+            break;
+        }
+        ensurance = atomicSub(&queue.count, 1) > 0;
+        if (!ensurance) {
+            num = atomicAdd(&queue.count, 1) + 1;
+        }
     }
-    queue.data[h & QUEUE_MASK] = value;
-    atomicAdd(&queue.activeCount, 1);
+    return ensurance;
+}
+
+fn waitForTicket(pos: u32, expected_ticket: u32) {
+    //loop {
+    for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
+        //storageBarrier();
+
+        if (atomicLoad(&queue.tickets[pos]) == expected_ticket) {
+            break;
+        }
+    }
+}
+
+fn putData(element: u32) {
+    let pos: u32 = atomicAdd(&queue.tail, 1);
+    let p: u32 = pos % QUEUE_SIZE;
+    let expected: u32 = 2 * (pos / QUEUE_SIZE);
+    waitForTicket(p, expected);
+    queue.ringbuffer[p] = element;
+    //storageBarrier();
+    atomicStore(&queue.tickets[p], expected + 1);
+}
+
+fn readData() -> u32 {
+    let pos: u32 = atomicAdd(&queue.head, 1);
+    let p: u32 = pos % QUEUE_SIZE;
+    let expected: u32 = 2 * (pos / QUEUE_SIZE);
+    waitForTicket(p, expected + 1);
+    var element: u32 = queue.ringbuffer[p];
+    //storageBarrier();
+    atomicStore(&queue.tickets[p], 2 * ((pos + QUEUE_SIZE) / QUEUE_SIZE));
+    return element;
+}
+
+fn enqueue(element: u32) -> bool {
+    //loop {
+    for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
+        if (ensureEnqueue()) {
+            break;
+        }
+        let head: u32 = atomicLoad(&queue.head);
+        let tail: u32 = atomicLoad(&queue.tail);
+        if (QUEUE_SIZE <= (tail - head) && (tail - head) < QUEUE_SIZE + (THREAD_COUNT / 2)) {
+            return false;
+        }
+
+        //storageBarrier();
+    }
+    putData(element);
     return true;
 }
 
-// bad    
-fn dequeue(value: ptr<function, u32>) -> bool {
-    if (atomicLoad(&queue.activeCount) == 0) {
-        return false;
+fn dequeue() -> u32 {
+    //loop {
+    for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
+        if (ensureDequeue()) {
+            break;
+        }
+        let head: u32 = atomicLoad(&queue.head);
+        let tail: u32 = atomicLoad(&queue.tail);
+
+        if (QUEUE_SIZE + (THREAD_COUNT / 2) <= (tail - head) - 1) {
+            return QUEUE_FAILURE;
+        }
+
+        //storageBarrier();
     }
-    let t: u32 = atomicLoad(&queue.tail);
-    let h: u32 = atomicLoad(&queue.head);
-    if (t >= h) {
-        return false;
-    }
-    let res = atomicCompareExchangeWeak(&queue.tail, t, t + 1);
-    if (!res.exchanged) {
-        return false;
-    }
-    *value = queue.data[t & QUEUE_MASK];
-    return true;
+    return readData();
 }
 
 override WORKGROUP_SIZE_1D: u32;
@@ -56,23 +130,24 @@ override INPUT_SIZE: u32;
     let workgroupCount: u32 = numWorkgroups.x;
     let index: u32 = globalInvocationId.x;
 
-    // enqueue initial tasks
+    // initial tasks dispatch
     if (workgroupCount == 1) {
         if (index == 0) {
             for (var i: u32 = 0; i < INPUT_SIZE / 2; i++) {
                 enqueue(INPUT_SIZE + i);
+                atomicAdd(&queue.workLeft, 1);
             }
         }
         return;
     }
 
-    // persistent thread
-    for (var l: u32 = 0; l < QUEUE_FAILURE; l++) {
+    // persistent thread dispatch
+    for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
 
-        var current: u32;
+        let current: u32 = dequeue();
 
         // try to get work
-        if (dequeue(&current)) {
+        if (current != QUEUE_FAILURE) {
 
             // do work
             let a: u32 = data[current * 2 - (INPUT_SIZE * 2)];
@@ -82,40 +157,20 @@ override INPUT_SIZE: u32;
             // push new work
             if (current % 2 == 0 && data[current + 1] != 0) {
                 let next: u32 = (current + (INPUT_SIZE * 2)) / 2;
-
-                for (var k: u32 = 0; k < QUEUE_FAILURE; k++) {
-                    if (enqueue(next)) {
-                        break;
-                    }
-                }
+                enqueue(next);
+                atomicAdd(&queue.workLeft, 1);
             }
             if (current % 2 == 1 && data[current - 1] != 0) {
                 let next: u32 = (current - 1 + (INPUT_SIZE * 2)) / 2;
+                enqueue(next);
+                atomicAdd(&queue.workLeft, 1);
+            }
+            
+            atomicSub(&queue.workLeft, 1);
 
-                for (var k: u32 = 0; k < QUEUE_FAILURE; k++) {
-                    if (enqueue(next)) {
-                        break;
-                    }
-                }
-            }
-            
-            atomicSub(&queue.activeCount, 1);
-            
-        } else {
-    
-            // terminate if no work and none working
-            if (atomicLoad(&queue.activeCount) == 0) {
-                break;
-            }
-            
-            // optional small yield/spin to reduce contention
-            var dummy: u32 = 0;
-            for (var i: u32 = 0; i < 100; i++) {
-                dummy += i;
-            }
-            if (dummy == 0xFFFFFFFFu) { 
-                atomicAdd(&queue.activeCount, 0); 
-            }
+        // terminate if no dequeue and no work/none working
+        } else if (atomicLoad(&queue.workLeft) == 0) {
+            break;
         }
     }
 }
