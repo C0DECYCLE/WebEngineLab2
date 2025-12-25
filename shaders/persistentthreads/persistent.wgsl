@@ -155,6 +155,8 @@ override INPUT_SIZE: u32;
             data[current] = a + b;
 
             // push new work
+            // attention! this data lookup wont work because not atomic and 
+            // no control barrier!
             if (current % 2 == 0 && data[current + 1] != 0) {
                 let next: u32 = (current + (INPUT_SIZE * 2)) / 2;
                 enqueue(next);
