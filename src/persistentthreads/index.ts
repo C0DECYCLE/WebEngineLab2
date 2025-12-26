@@ -1,3 +1,8 @@
+/**
+ * Copyright (C) - All Rights Reserved
+ * Written by Noah Mattia Bussinger
+ */
+
 import { log } from "../utilities/logger.js";
 import { assert, loadText, sum } from "../utilities/utils.js";
 import { float, int, Nullable } from "../utilities/utils.type.js";
@@ -18,10 +23,10 @@ export const Bytes64: int = 8;
 export const QueryStride: int = 2;
 export const QueryCapacity: int = 2;
 
-export const PersistentThreads: int = 16384 * 64; //1048576 16384 * 64
-export const PersistentQueueSize: int = 65536; //65536 sync with shader later override
+export const PersistentWorkgroups: int = 1;
+export const PersistentWorkgroupThreads: int = 64;
 
-export const WorkGroupSize1D: int = 64;
+export const WorkgroupSize1D: int = 64;
 
 export const MsToNanos: int = 1_000_000;
 
@@ -106,6 +111,7 @@ device.queue.writeBuffer(
     0 * Bytes32,
     InputSize * Bytes32,
 );
+/*
 const persistentQueueBuffer: GPUBuffer = device.createBuffer({
     size: (3 + PersistentQueueSize * 2 + 1) * Bytes32,
     usage:
@@ -113,14 +119,17 @@ const persistentQueueBuffer: GPUBuffer = device.createBuffer({
         GPUBufferUsage.COPY_SRC |
         GPUBufferUsage.COPY_DST,
 });
+*/
 const persistentReadbackBuffer: GPUBuffer = device.createBuffer({
     size: InputSize * 2 * Bytes32,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
+/*
 const persistentQueueReadbackBuffer: GPUBuffer = device.createBuffer({
     size: (3 + PersistentQueueSize * 2 + 1) * Bytes32,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
+*/
 
 /* QUERIES */
 
@@ -160,7 +169,7 @@ const legacyPipeline: GPUComputePipeline =
             module: legacyShader,
             entryPoint: "cs",
             constants: {
-                WORKGROUP_SIZE_1D: WorkGroupSize1D,
+                WORKGROUP_SIZE_1D: WorkgroupSize1D,
             },
         },
     });
@@ -172,8 +181,7 @@ const persistentPipeline: GPUComputePipeline =
             module: persistentShader,
             entryPoint: "cs",
             constants: {
-                WORKGROUP_SIZE_1D: WorkGroupSize1D,
-                //QUEUE_SIZE: PersistentQueueSize,
+                WORKGROUP_THREADS: PersistentWorkgroupThreads,
                 INPUT_SIZE: InputSize,
             },
         },
@@ -198,7 +206,7 @@ const persistentBindGroup: GPUBindGroup = device.createBindGroup({
     layout: persistentPipeline.getBindGroupLayout(0),
     entries: [
         { binding: 0, resource: persistentDataBuffer },
-        { binding: 1, resource: persistentQueueBuffer },
+        //{ binding: 1, resource: persistentQueueBuffer },
     ],
 });
 
@@ -218,7 +226,7 @@ legacyPass.setBindGroup(0, legacyDataBindGroup);
 for (let i: int = 0; i < InputLayerCount; i++) {
     legacyPass.setBindGroup(1, legacyOperationBindGroups[i]);
     const length: int = Math.pow(2, InputLayerCount - (i + 1));
-    const count: int = Math.ceil(length / WorkGroupSize1D);
+    const count: int = Math.ceil(length / WorkgroupSize1D);
     legacyPass.dispatchWorkgroups(Math.max(1, count));
 }
 legacyPass.end();
@@ -231,12 +239,6 @@ encoder.copyBufferToBuffer(
     InputSize * 2 * Bytes32,
 );
 
-const persistentPrePass: GPUComputePassEncoder = encoder.beginComputePass({});
-persistentPrePass.setPipeline(persistentPipeline);
-persistentPrePass.setBindGroup(0, persistentBindGroup);
-persistentPrePass.dispatchWorkgroups(1);
-persistentPrePass.end();
-
 const persistentPass: GPUComputePassEncoder = encoder.beginComputePass({
     timestampWrites: {
         querySet: querySet,
@@ -246,8 +248,7 @@ const persistentPass: GPUComputePassEncoder = encoder.beginComputePass({
 });
 persistentPass.setPipeline(persistentPipeline);
 persistentPass.setBindGroup(0, persistentBindGroup);
-const count: int = Math.ceil(PersistentThreads / WorkGroupSize1D);
-persistentPass.dispatchWorkgroups(Math.max(1, count));
+persistentPass.dispatchWorkgroups(Math.max(1, PersistentWorkgroups));
 persistentPass.end();
 
 encoder.copyBufferToBuffer(
@@ -257,6 +258,7 @@ encoder.copyBufferToBuffer(
     0 * Bytes32,
     InputSize * 2 * Bytes32,
 );
+/*
 encoder.copyBufferToBuffer(
     persistentQueueBuffer,
     0 * Bytes32,
@@ -264,6 +266,7 @@ encoder.copyBufferToBuffer(
     0 * Bytes32,
     (3 + PersistentQueueSize * 2 + 1) * Bytes32,
 );
+*/
 
 encoder.resolveQuerySet(
     querySet,
@@ -314,11 +317,11 @@ const persistentData: Uint32Array = new Uint32Array(
 //verify(persistentData, simulationData);
 log("Persistent data", persistentData);
 output(persistentData, true);
-
+/*
 await persistentQueueReadbackBuffer.mapAsync(GPUMapMode.READ);
 const persistentQueue: Uint32Array = new Uint32Array(
     persistentQueueReadbackBuffer.getMappedRange(),
 );
 log("Persistent queue", persistentQueue);
-
+*/
 log("----------------------------------------------------");
