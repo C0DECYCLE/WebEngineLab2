@@ -25,6 +25,7 @@ export const QueryCapacity: int = 2;
 
 export const PersistentWorkgroups: int = 1;
 export const PersistentWorkgroupThreads: int = 64;
+export const PersistentQueueBufferSize: int = 2 + 2048;
 
 export const WorkgroupSize1D: int = 64;
 
@@ -111,25 +112,21 @@ device.queue.writeBuffer(
     0 * Bytes32,
     InputSize * Bytes32,
 );
-/*
-const persistentQueueBuffer: GPUBuffer = device.createBuffer({
-    size: (3 + PersistentQueueSize * 2 + 1) * Bytes32,
+const persistentDebugBuffer: GPUBuffer = device.createBuffer({
+    size: PersistentQueueBufferSize * Bytes32,
     usage:
         GPUBufferUsage.STORAGE |
         GPUBufferUsage.COPY_SRC |
         GPUBufferUsage.COPY_DST,
 });
-*/
 const persistentReadbackBuffer: GPUBuffer = device.createBuffer({
     size: InputSize * 2 * Bytes32,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
-/*
-const persistentQueueReadbackBuffer: GPUBuffer = device.createBuffer({
-    size: (3 + PersistentQueueSize * 2 + 1) * Bytes32,
+const persistentDebugReadbackBuffer: GPUBuffer = device.createBuffer({
+    size: PersistentQueueBufferSize * Bytes32,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
 });
-*/
 
 /* QUERIES */
 
@@ -206,7 +203,7 @@ const persistentBindGroup: GPUBindGroup = device.createBindGroup({
     layout: persistentPipeline.getBindGroupLayout(0),
     entries: [
         { binding: 0, resource: persistentDataBuffer },
-        //{ binding: 1, resource: persistentQueueBuffer },
+        { binding: 1, resource: persistentDebugBuffer },
     ],
 });
 
@@ -258,15 +255,13 @@ encoder.copyBufferToBuffer(
     0 * Bytes32,
     InputSize * 2 * Bytes32,
 );
-/*
 encoder.copyBufferToBuffer(
-    persistentQueueBuffer,
+    persistentDebugBuffer,
     0 * Bytes32,
-    persistentQueueReadbackBuffer,
+    persistentDebugReadbackBuffer,
     0 * Bytes32,
-    (3 + PersistentQueueSize * 2 + 1) * Bytes32,
+    PersistentQueueBufferSize * Bytes32,
 );
-*/
 
 encoder.resolveQuerySet(
     querySet,
@@ -317,11 +312,11 @@ const persistentData: Uint32Array = new Uint32Array(
 //verify(persistentData, simulationData);
 log("Persistent data", persistentData);
 output(persistentData, true);
-/*
-await persistentQueueReadbackBuffer.mapAsync(GPUMapMode.READ);
+
+await persistentDebugReadbackBuffer.mapAsync(GPUMapMode.READ);
 const persistentQueue: Uint32Array = new Uint32Array(
-    persistentQueueReadbackBuffer.getMappedRange(),
+    persistentDebugReadbackBuffer.getMappedRange(),
 );
 log("Persistent queue", persistentQueue);
-*/
+
 log("----------------------------------------------------");

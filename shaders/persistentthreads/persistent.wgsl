@@ -2,12 +2,81 @@
  * Copyright (C) - All Rights Reserved
  * Written by Noah Mattia Bussinger
  */
+ 
+/* WORKGROUP */
 
-const QUEUE_CAPACITY: u32 = 2048;
+override WORKGROUP_THREADS: u32;
+
+var<workgroup> any_all: atomic<u32>;
+
+fn workgroupAny(LID: u32, condition: bool) -> bool {
+    workgroupBarrier();
+    if (LID == 0) {
+        atomicStore(&any_all, 0);
+    }
+    workgroupBarrier();
+    if (condition) {
+        atomicStore(&any_all, 1);
+    }
+    workgroupBarrier();
+    return atomicLoad(&any_all) == 1; //workgroupUniformLoad and no barrier
+}
+
+fn workgroupAll(LID: u32, condition: bool) -> bool {
+    workgroupBarrier();
+    if (LID == 0) {
+        atomicStore(&any_all, 0);
+    }
+    workgroupBarrier();
+    if (condition) {
+        atomicAdd(&any_all, 1);
+    }
+    workgroupBarrier();
+    return atomicLoad(&any_all) == WORKGROUP_THREADS; //workgroupUniformLoad and no barrier
+}
+
+/* QUEUE */
+
+const QUEUE_CAPACITY: u32 = 1024; //more? limit 4096 - 2
 const QUEUE_FAILURE: u32 = 4294967295;
 
-const LOOP_LIMIT: u32 = 1024;
+const LOOP_LIMIT: u32 = 4294967295; //1024;
 
+struct Queue {
+    head: atomic<u32>,
+    tail: atomic<u32>,
+    ringbuffer: array<u32, QUEUE_CAPACITY>,
+}
+
+var<workgroup> queue: Queue;
+
+fn enqueue(value: u32) -> bool {
+    let head: u32 = atomicLoad(&queue.head);
+    let tail: u32 = atomicLoad(&queue.tail);
+    if (head - tail >= QUEUE_CAPACITY) { 
+        return false; 
+    }
+    if (!atomicCompareExchangeWeak(&queue.head, head, head + 1).exchanged) {
+        return false;
+    }
+    queue.ringbuffer[head % QUEUE_CAPACITY] = value;
+    return true;
+}
+
+fn dequeue(value: ptr<function, u32>) -> bool {
+    let head: u32 = atomicLoad(&queue.head);
+    let tail: u32 = atomicLoad(&queue.tail);
+    if (tail >= head) {
+        return false;
+    }
+    if (!atomicCompareExchangeWeak(&queue.tail, tail, tail + 1).exchanged) {
+        return false;
+    }
+    *value = queue.ringbuffer[tail % QUEUE_CAPACITY];
+    return true;
+}
+
+/*
 struct Queue {
     head: atomic<u32>,
     tail: atomic<u32>,
@@ -17,6 +86,8 @@ struct Queue {
     //
     //workLeft: atomic<u32>,
 }
+
+var<workgroup> queue: Queue;
 
 fn ensureEnqueue() -> bool {
     var num: i32 = atomicLoad(&queue.count);
@@ -87,7 +158,7 @@ fn readData() -> u32 {
     return element;
 }
 
-fn enqueue(element: u32) -> bool {
+fn enqueue(LID: u32, element: u32) -> bool {
     //loop {
     for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
         if (ensureEnqueue()) {
@@ -124,18 +195,21 @@ fn dequeue() -> u32 {
     }
     return readData();
 }
+*/
 
-override WORKGROUP_THREADS: u32;
+/* DISPATCH */
+
 override INPUT_SIZE: u32;
 
 @group(0) @binding(0) var<storage, read_write> data: array<u32>;
-var<workgroup> queue: Queue;
+@group(0) @binding(1) var<storage, read_write> debug: Queue;
 
 @compute @workgroup_size(WORKGROUP_THREADS) fn cs(
-    @builtin(local_invocation_index) index: u32
+    @builtin(local_invocation_index) LID: u32
 ) {
-    // initial tasks dispatch
-    if (index == 0) {
+    /* INITIALIZE */
+
+    if (LID == 0) {
         for (var i: u32 = 0; i < INPUT_SIZE / 2; i++) {
             enqueue(INPUT_SIZE + i);
             //atomicAdd(&queue.workLeft, 1);
@@ -144,7 +218,8 @@ var<workgroup> queue: Queue;
     /*
     workgroupBarrier();
 
-    // persistent thread dispatch
+    /* PERSISTENT */
+
     for (var l: u32 = 0; l < LOOP_LIMIT; l++) {
 
         let current: u32 = dequeue();
@@ -181,4 +256,13 @@ var<workgroup> queue: Queue;
         }
     }
     */
+    data[0] = data[0];
+
+    /* DEBUG */
+
+    if (LID == 0) {
+        atomicStore(&debug.head, atomicLoad(&queue.head));
+        atomicStore(&debug.tail, atomicLoad(&queue.tail));
+        debug.ringbuffer = queue.ringbuffer;
+    }
 }
