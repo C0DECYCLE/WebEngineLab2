@@ -22,6 +22,7 @@ import {
     // @ts-ignore
 } from "../../../node_modules/meshoptimizer/meshopt_clusterizer.module.js";
 import { loadOBJ } from "../instancebatching/helper.js";
+import { clusterizeTriangles, Mesh } from "./helper.js";
 
 function createCanvas(): HTMLCanvasElement {
     const canvas: HTMLCanvasElement = document.createElement("canvas");
@@ -77,8 +78,8 @@ const maxTriangles: int = 128;
 const numVertices: int = 3;
 const vertexStride: int = 3 + 1;
 const instanceStride: int = 3 + 1 + 1 + 3;
-const instanceCount: int = 125;
-const spawnSize: int = 5;
+const instanceCount: int = 1; //125;
+const spawnSize: int = 1; //5;
 const maxTasks: int = 1_000_000;
 const taskStride: int = 1 + 1;
 
@@ -130,7 +131,7 @@ const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
     depthStencil: {
         depthWriteEnabled: true,
         depthCompare: "less",
-        format: "depth24plus",
+        format: "depth32float",
     } as GPUDepthStencilState,
 } as GPURenderPipelineDescriptor);
 
@@ -146,7 +147,7 @@ const colorAttachment: GPURenderPassColorAttachment = {
 const depthTexture: GPUTexture = device.createTexture({
     label: "depth texture",
     size: [canvas.width, canvas.height],
-    format: "depth24plus",
+    format: "depth32float",
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
 } as GPUTextureDescriptor);
 const depthStencilAttachment: GPURenderPassDepthStencilAttachment = {
@@ -183,6 +184,45 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 //////////// VERTICES ////////////
 
 const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
+// /*
+const meshlets: Mesh[] = clusterizeTriangles({
+    positions: data.vertices,
+    indices: data.indices!,
+});
+const meshletsCount: int = meshlets.length;
+const verticesCount: int = meshletsCount * maxTriangles * numVertices;
+const verticesData: Float32Array = new Float32Array(
+    verticesCount * vertexStride,
+);
+let stat: Uint32Array = new Uint32Array(maxTriangles + 1);
+for (let m: int = 0; m < meshletsCount; m++) {
+    const indices: Uint32Array = meshlets[m].indices;
+    const vertices: Float32Array = meshlets[m].positions;
+    const numTriangles: int = indices.length / 3;
+    stat[numTriangles]++;
+    for (let t: int = 0; t < numTriangles; t++) {
+        const triangleOffset: int = m * maxTriangles + t;
+
+        for (let v: int = 0; v < numVertices; v++) {
+            const vertexOffset: int = triangleOffset * numVertices + v;
+            const index: int = indices[t * numVertices + v];
+
+            const srcOffset: int = index * vertexStride;
+            const dstOffset: int = vertexOffset * vertexStride;
+            verticesData[dstOffset + 0] = vertices[srcOffset + 0];
+            verticesData[dstOffset + 1] = vertices[srcOffset + 1];
+            verticesData[dstOffset + 2] = vertices[srcOffset + 2];
+            verticesData[dstOffset + 3] = vertices[srcOffset + 2];
+        }
+    }
+}
+for (let i: int = 0; i < stat.length; i++) {
+    if (stat[i] !== 0) {
+        log(i + ": " + stat[i]);
+    }
+}
+// */
+/*
 const meshlets = MeshoptClusterizer.buildMeshlets(
     data.indices!,
     data.vertices,
@@ -195,14 +235,14 @@ const verticesCount: int = meshletsCount * maxTriangles * numVertices;
 const verticesData: Float32Array = new Float32Array(
     verticesCount * vertexStride,
 );
-
+let stat: Uint32Array = new Uint32Array(maxTriangles + 1);
 for (let i: int = 0; i < meshletsCount; i++) {
     const meshletsOffset: int = i * vertexStride;
     const vertexOffset: int = meshlets.meshlets[meshletsOffset + 0];
     const triangleOffset: int = meshlets.meshlets[meshletsOffset + 1];
     const triangleCount: int = meshlets.meshlets[meshletsOffset + 3];
     const targetOffset: int = i * maxTriangles * numVertices;
-
+    stat[triangleCount]++;
     for (let j: int = 0; j < triangleCount * numVertices; j++) {
         const trianglesOffset: int = triangleOffset + j;
         const verticesIndex: int =
@@ -210,12 +250,17 @@ for (let i: int = 0; i < meshletsCount; i++) {
         const originalIndex: float =
             meshlets.vertices[verticesIndex] * vertexStride;
         const verticesOffset: int = (targetOffset + j) * vertexStride;
-
         verticesData[verticesOffset + 0] = data.vertices[originalIndex + 0];
         verticesData[verticesOffset + 1] = data.vertices[originalIndex + 1];
         verticesData[verticesOffset + 2] = data.vertices[originalIndex + 2];
     }
 }
+for (let i: int = 0; i < stat.length; i++) {
+    if (stat[i] !== 0) {
+        log(i + ": " + stat[i]);
+    }
+}
+*/
 
 const vertexArrayBuffer: ArrayBufferLike = verticesData.buffer;
 const verticesBuffer: GPUBuffer = device.createBuffer({
@@ -370,7 +415,7 @@ const renderBundleEncoder: GPURenderBundleEncoder =
     device.createRenderBundleEncoder({
         label: "render bundle",
         colorFormats: [presentationFormat],
-        depthStencilFormat: "depth24plus",
+        depthStencilFormat: "depth32float",
     } as GPURenderBundleEncoderDescriptor);
 renderBundleEncoder.setPipeline(renderPipeline);
 renderBundleEncoder.setBindGroup(0, renderBindGroup);
