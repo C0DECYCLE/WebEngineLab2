@@ -10,7 +10,7 @@ import { ensure, output, populate, simulate, verify } from "./helper.js";
 
 /* CONSTANTS */
 
-export const InputSize: int = 8; //1024 * 1024;
+export const InputSize: int = 4096; //1024 * 1024;
 export const InputMax: int = 10; //1000;
 export const InputLayerCount: int = Math.log2(InputSize);
 log("Input size", InputSize);
@@ -24,8 +24,8 @@ export const QueryStride: int = 2;
 export const QueryCapacity: int = 2;
 
 export const PersistentWorkgroups: int = 1;
-export const PersistentWorkgroupThreads: int = 64;
-export const PersistentQueueBufferSize: int = 2 + 2048;
+export const PersistentWorkgroupThreads: int = 256;
+export const PersistentQueueBufferSize: int = 1 + 2048;
 
 export const WorkgroupSize1D: int = 64;
 
@@ -309,7 +309,7 @@ await persistentReadbackBuffer.mapAsync(GPUMapMode.READ);
 const persistentData: Uint32Array = new Uint32Array(
     persistentReadbackBuffer.getMappedRange(),
 );
-//verify(persistentData, simulationData);
+verify(persistentData, simulationData);
 log("Persistent data", persistentData);
 output(persistentData, true);
 
