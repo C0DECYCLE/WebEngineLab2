@@ -1,6 +1,6 @@
-# 🪶 WebEngine Lab 2
+# WebEngine Lab 2
 
-> Experimental lab 2 for a lightweight graphics engine for the web.
+> Experimental lab 2 for computer graphics on the web.
 
 -   [x] dependency injection, import or provider?
 -   [ ] clean code robert c martin

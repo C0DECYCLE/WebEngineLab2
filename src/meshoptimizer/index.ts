@@ -22,7 +22,8 @@ import {
     // @ts-ignore
 } from "../../../node_modules/meshoptimizer/meshopt_clusterizer.module.js";
 import { loadOBJ } from "../instancebatching/helper.js";
-import { clusterizeTriangles, Mesh } from "./helper.js";
+import { clusterizeTriangles, Mesh } from "./clusterize.js";
+import { groupClusters } from "./group.js";
 
 function createCanvas(): HTMLCanvasElement {
     const canvas: HTMLCanvasElement = document.createElement("canvas");
@@ -189,6 +190,13 @@ const meshlets: Mesh[] = clusterizeTriangles({
     positions: data.vertices,
     indices: data.indices!,
 });
+const meshletToGroup: int[] = [];
+const groups = groupClusters(meshlets);
+for (let g: int = 0; g < groups.length; g++) {
+    groups[g].meshletIndices.forEach(
+        (meshletIndex) => (meshletToGroup[meshletIndex] = g),
+    );
+}
 const meshletsCount: int = meshlets.length;
 const verticesCount: int = meshletsCount * maxTriangles * numVertices;
 const verticesData: Float32Array = new Float32Array(
@@ -196,6 +204,7 @@ const verticesData: Float32Array = new Float32Array(
 );
 let stat: Uint32Array = new Uint32Array(maxTriangles + 1);
 for (let m: int = 0; m < meshletsCount; m++) {
+    const group: int = meshletToGroup[m];
     const indices: Uint32Array = meshlets[m].indices;
     const vertices: Float32Array = meshlets[m].positions;
     const numTriangles: int = indices.length / 3;
@@ -212,7 +221,7 @@ for (let m: int = 0; m < meshletsCount; m++) {
             verticesData[dstOffset + 0] = vertices[srcOffset + 0];
             verticesData[dstOffset + 1] = vertices[srcOffset + 1];
             verticesData[dstOffset + 2] = vertices[srcOffset + 2];
-            verticesData[dstOffset + 3] = vertices[srcOffset + 2];
+            verticesData[dstOffset + 3] = group;
         }
     }
 }

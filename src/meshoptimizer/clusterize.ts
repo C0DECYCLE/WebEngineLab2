@@ -6,17 +6,15 @@
 //import { log } from "../utilities/logger.js";
 
 export type Mesh = {
-    positions: Float32Array; // xyzw xyzw ...
-    indices: Uint32Array; // 3 per triangle
+    positions: Float32Array;
+    indices: Uint32Array;
 };
 
 const maxTris: number = 128;
 const maxVerts: number = 384;
 const minTris: number = 64;
 
-export function buildMeshletsMinVertexSharing(
-    indices: Uint32Array,
-): number[][] {
+function buildMeshletsMinVertexSharing(indices: Uint32Array): number[][] {
     const triCount = indices.length / 3;
 
     const triVerts: number[][] = new Array(triCount);
@@ -114,7 +112,7 @@ export function buildMeshletsMinVertexSharing(
     return meshlets;
 }
 
-export function mergeSmallMeshlets(
+function mergeSmallMeshlets(
     meshlets: number[][],
     indices: Uint32Array,
 ): number[][] {
