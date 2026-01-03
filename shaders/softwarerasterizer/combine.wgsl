@@ -3,6 +3,9 @@
  * Written by Noah Mattia Bussinger, January 2026
  */
 
+#include structs.wgsl;
+#include depthColorPack.wgsl;
+
 override SCREEN_WIDTH: u32;
 override SCREEN_HEIGHT: u32;
 
@@ -20,26 +23,14 @@ override SCREEN_HEIGHT: u32;
 }
 
 @fragment fn fs(
-    @builtin(position) clipspace: vec4f
+    @builtin(position) position: vec4f
 ) -> @location(0) vec4f {
-    let index: u32 = u32(clipspace.y) * SCREEN_WIDTH + u32(clipspace.x);
-    let value: u32 = frame[index];
+    let pixel: u32 = u32(position.y) * SCREEN_WIDTH + u32(position.x);
+    let value: u32 = frame[pixel];
     if (value == 0) {
         discard;
     }
     let color: vec3f = unpack_color(value);
     //let depth: f32 = unpack_depth(value);
     return vec4f(color, 1);
-}
-
-fn unpack_depth(value: u32) -> f32 {
-    return 1 - (f32(value >> 8) / 16777215);
-}
-
-fn unpack_color(value: u32) -> vec3f {
-    let c: u32 = value & 0xFFu;
-    let r: f32 = f32((c >> 5) & 7) / 7;
-    let g: f32 = f32((c >> 2) & 7) / 7;
-    let b: f32 = f32(c & 3) / 3;
-    return vec3f(r, g, b);
 }

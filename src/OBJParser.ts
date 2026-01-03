@@ -4,6 +4,7 @@
  */
 
 import { int, float, Nullable } from "../types/utilities/utils.type.js";
+import { log } from "./utilities/logger.js";
 import { clear } from "./utilities/utils.js";
 import { Vec3 } from "./utilities/Vec3.js";
 
@@ -42,6 +43,7 @@ export class OBJParser {
         for (let i: int = 0; i < lines.length; ++i) {
             this.parseLine(regExp, lines[i].trim(), indexed, color);
         }
+        log(this.cache);
         const result: OBJParseResult = {
             vertices: new Float32Array(this.vertexCache),
             verticesCount:
@@ -112,7 +114,11 @@ export class OBJParser {
 
     private registerVertex(vertex: OBJVertex): void {
         this.vertexCache.push(vertex[0], vertex[1], vertex[2], 0);
-        if (vertex[3] && vertex[4] && vertex[5]) {
+        if (
+            vertex[3] !== undefined &&
+            vertex[4] !== undefined &&
+            vertex[5] !== undefined
+        ) {
             this.vertexCache.push(vertex[3], vertex[4], vertex[5], 0);
         }
     }
