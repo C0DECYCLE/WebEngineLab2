@@ -252,11 +252,17 @@ export function clusterizeTriangles(mesh: Mesh): Mesh[] {
 }
 */
 
-function buildTriangleAdjacency(mesh: Mesh): number[][] {
+type WeightedAdjacency = {
+    xadj: number[];
+    adjncy: number[];
+    adjwgt: number[];
+};
+
+function buildWeightedTriangleAdjacency(mesh: Mesh): WeightedAdjacency {
     const indices = mesh.indices;
     const triCount = indices.length / 3;
 
-    // edge key -> triangle index
+    // Map edge -> triangles
     const edgeMap = new Map<string, number[]>();
 
     function edgeKey(a: number, b: number) {
@@ -268,35 +274,46 @@ function buildTriangleAdjacency(mesh: Mesh): number[][] {
         const i1 = indices[t * 3 + 1];
         const i2 = indices[t * 3 + 2];
 
-        const edges = [edgeKey(i0, i1), edgeKey(i1, i2), edgeKey(i2, i0)];
-
-        for (const e of edges) {
-            let list = edgeMap.get(e);
-            if (!list) {
-                list = [];
-                edgeMap.set(e, list);
-            }
-            list.push(t);
-        }
+        edgeMap.get(edgeKey(i0, i1))?.push(t) ??
+            edgeMap.set(edgeKey(i0, i1), [t]);
+        edgeMap.get(edgeKey(i1, i2))?.push(t) ??
+            edgeMap.set(edgeKey(i1, i2), [t]);
+        edgeMap.get(edgeKey(i2, i0))?.push(t) ??
+            edgeMap.set(edgeKey(i2, i0), [t]);
     }
 
-    // build adjacency
     const adjacency: number[][] = Array.from({ length: triCount }, () => []);
+    const weights: number[][] = Array.from({ length: triCount }, () => []);
 
     for (const tris of edgeMap.values()) {
         if (tris.length === 2) {
             const [a, b] = tris;
+
+            // shared vertices = 2 (by construction)
             adjacency[a].push(b);
+            weights[a].push(2);
+
             adjacency[b].push(a);
+            weights[b].push(2);
         }
     }
 
-    return adjacency;
+    // Flatten into METIS format
+    const xadj: number[] = [0];
+    const adjncy: number[] = [];
+    const adjwgt: number[] = [];
+
+    for (let i = 0; i < triCount; i++) {
+        adjncy.push(...adjacency[i]);
+        adjwgt.push(...weights[i]);
+        xadj.push(adjncy.length);
+    }
+
+    return { xadj, adjncy, adjwgt };
 }
 
-const VERTEX_STRIDE = 4;
-
 function buildMeshletsFromClusters(mesh: Mesh, clusters: number[][]): Mesh[] {
+    const VERTEX_STRIDE = 4;
     const srcPos = mesh.positions;
     const srcIdx = mesh.indices;
 
@@ -343,16 +360,14 @@ function buildMeshletsFromClusters(mesh: Mesh, clusters: number[][]): Mesh[] {
 
 export async function clusterizeTriangles(mesh: Mesh): Promise<Mesh[]> {
     const triCount = mesh.indices.length / 3;
-    const targetMeshlets = Math.ceil(triCount / 126);
-    const opts: MetisOptions = {};
+    const nparts = Math.ceil(triCount / 126);
 
-    const adjacency = buildTriangleAdjacency(mesh);
+    const { xadj, adjncy, adjwgt } = buildWeightedTriangleAdjacency(mesh);
 
-    const clusters = await partitionGraph(adjacency, targetMeshlets, {
+    const clusters = await partitionGraph(xadj, adjncy, adjwgt, nparts, {
         [METIS_OPTION.NUMBERING]: 0,
         [METIS_OPTION.CONTIG]: 1,
         [METIS_OPTION.UFACTOR]: 1,
-        ...opts,
     });
 
     return buildMeshletsFromClusters(mesh, clusters);

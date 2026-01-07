@@ -188,19 +188,21 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
 const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
 // /*
+const now: float = performance.now();
 const meshlets: Mesh[] = await clusterizeTriangles({
     positions: data.vertices,
     indices: data.indices!,
 });
-/*
+log("clusterize", performance.now() - now, "ms");
+
 const meshletToGroup: int[] = [];
-const groups = groupClusters(meshlets);
+const now2: float = performance.now();
+const groups = await groupClusters(meshlets);
+log("group", performance.now() - now2, "ms");
 for (let g: int = 0; g < groups.length; g++) {
-    groups[g].meshletIndices.forEach(
-        (meshletIndex) => (meshletToGroup[meshletIndex] = g),
-    );
+    groups[g].forEach((meshletIndex) => (meshletToGroup[meshletIndex] = g));
 }
-*/
+
 const meshletsCount: int = meshlets.length;
 const verticesCount: int = meshletsCount * maxTriangles * numVertices;
 const verticesData: Float32Array = new Float32Array(
@@ -208,7 +210,7 @@ const verticesData: Float32Array = new Float32Array(
 );
 let stat: Uint32Array = new Uint32Array(maxTriangles + 1);
 for (let m: int = 0; m < meshletsCount; m++) {
-    //const group: int = meshletToGroup[m];
+    const group: int = meshletToGroup[m];
     const indices: Uint32Array = meshlets[m].indices;
     const vertices: Float32Array = meshlets[m].positions;
     const numTriangles: int = indices.length / 3;
@@ -225,7 +227,7 @@ for (let m: int = 0; m < meshletsCount; m++) {
             verticesData[dstOffset + 0] = vertices[srcOffset + 0];
             verticesData[dstOffset + 1] = vertices[srcOffset + 1];
             verticesData[dstOffset + 2] = vertices[srcOffset + 2];
-            //verticesData[dstOffset + 3] = group;
+            verticesData[dstOffset + 3] = group;
         }
     }
 }

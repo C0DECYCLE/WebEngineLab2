@@ -122,18 +122,21 @@ const METIS_ERROR = -4; // Some other errors
  * @returns array of size `nparts`, each contains vertex ids
  */
 export function partitionGraph(
-    adjacency: number[][],
+    xadj: number[],
+    adjncy: number[],
+    adjwgt: number[],
     nparts: number,
     opts: MetisOptions = {},
 ) {
-    const [xadj, adjncy] = createAdjacencyData(adjacency);
-    return partitionGraphImpl(xadj, adjncy, nparts, opts);
+    //const [xadj, adjncy] = createAdjacencyData(adjacency);
+    return partitionGraphImpl(xadj, adjncy, adjwgt, nparts, opts);
 }
 
 /** Internal/test use mostly. Call `partitionGraph()` instead. */
 export async function partitionGraphImpl(
     xadj: number[],
     adjncy: number[],
+    adjwgt: number[],
     nparts: number,
     opts: MetisOptions = {},
 ) {
@@ -160,7 +163,7 @@ export async function partitionGraphImpl(
         null, // idx_t *vsize,
         // TODO [IGNORE] UE5 adjwgt: https://github.com/EpicGames/UnrealEngine/blob/ue5-main/Engine/Source/Developer/NaniteBuilder/Private/GraphPartitioner.cpp#L63
         // https://youtu.be/eviSykqSUUw?si=GttgyFXof02ENUa4&t=1095
-        null, // idx_t *adjwgt,
+        i32Arr(adjwgt), // idx_t *adjwgt,
         i32(nparts), // idx_t *nparts,
         null, // real_t *tpwgts,
         null, // real_t *ubvec,
