@@ -17,10 +17,12 @@ import { Controller } from "../Controller.js";
 import { OBJParseResult } from "../OBJParser.js";
 import { Stats } from "../Stats.js";
 import { RollingAverage } from "../RollingAverage.js";
+/*
 import {
     MeshoptClusterizer,
     // @ts-ignore
 } from "../../../node_modules/meshoptimizer/meshopt_clusterizer.module.js";
+ */
 import { loadOBJ } from "../instancebatching/helper.js";
 import { clusterizeTriangles, Mesh } from "./clusterize.js";
 import { groupClusters } from "./group.js";
@@ -74,7 +76,7 @@ const renderShader: GPUShaderModule = device.createShaderModule({
 //////////// CONSTS ////////////
 
 const byteSize: int = 4;
-const maxVertices: int = 255;
+//const maxVertices: int = 255;
 const maxTriangles: int = 128;
 const numVertices: int = 3;
 const vertexStride: int = 3 + 1;
@@ -186,10 +188,11 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
 const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
 // /*
-const meshlets: Mesh[] = clusterizeTriangles({
+const meshlets: Mesh[] = await clusterizeTriangles({
     positions: data.vertices,
     indices: data.indices!,
 });
+/*
 const meshletToGroup: int[] = [];
 const groups = groupClusters(meshlets);
 for (let g: int = 0; g < groups.length; g++) {
@@ -197,6 +200,7 @@ for (let g: int = 0; g < groups.length; g++) {
         (meshletIndex) => (meshletToGroup[meshletIndex] = g),
     );
 }
+*/
 const meshletsCount: int = meshlets.length;
 const verticesCount: int = meshletsCount * maxTriangles * numVertices;
 const verticesData: Float32Array = new Float32Array(
@@ -204,7 +208,7 @@ const verticesData: Float32Array = new Float32Array(
 );
 let stat: Uint32Array = new Uint32Array(maxTriangles + 1);
 for (let m: int = 0; m < meshletsCount; m++) {
-    const group: int = meshletToGroup[m];
+    //const group: int = meshletToGroup[m];
     const indices: Uint32Array = meshlets[m].indices;
     const vertices: Float32Array = meshlets[m].positions;
     const numTriangles: int = indices.length / 3;
@@ -221,7 +225,7 @@ for (let m: int = 0; m < meshletsCount; m++) {
             verticesData[dstOffset + 0] = vertices[srcOffset + 0];
             verticesData[dstOffset + 1] = vertices[srcOffset + 1];
             verticesData[dstOffset + 2] = vertices[srcOffset + 2];
-            verticesData[dstOffset + 3] = group;
+            //verticesData[dstOffset + 3] = group;
         }
     }
 }

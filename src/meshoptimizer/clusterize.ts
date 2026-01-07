@@ -3,6 +3,12 @@
  * Written by Noah Mattia Bussinger
  */
 
+import {
+    METIS_OPTION,
+    MetisOptions,
+    partitionGraph,
+} from "./METISb/partitionGraph.js";
+
 //import { log } from "../utilities/logger.js";
 
 export type Mesh = {
@@ -10,6 +16,7 @@ export type Mesh = {
     indices: Uint32Array;
 };
 
+/*
 const maxTris: number = 128;
 const maxVerts: number = 384;
 const minTris: number = 64;
@@ -151,9 +158,9 @@ function mergeSmallMeshlets(
         let bestAddedVerts = Infinity;
 
         // Find neighboring meshlets
-        const neighborSet = new Set<number>();
+        //const neighborSet = new Set<number>();
         for (const t of meshlets[i]) {
-            for (const v of triVerts[t]) {
+            for (const _v of triVerts[t]) {
                 // find triangles sharing this vertex
                 for (let ot = 0; ot < triToMeshlet.length; ot++) {
                     if (triToMeshlet[ot] === i) continue;
@@ -242,4 +249,111 @@ export function clusterizeTriangles(mesh: Mesh): Mesh[] {
         buildMeshlet(mesh, cluster),
     );
     return meshlets;
+}
+*/
+
+function buildTriangleAdjacency(mesh: Mesh): number[][] {
+    const indices = mesh.indices;
+    const triCount = indices.length / 3;
+
+    // edge key -> triangle index
+    const edgeMap = new Map<string, number[]>();
+
+    function edgeKey(a: number, b: number) {
+        return a < b ? `${a}_${b}` : `${b}_${a}`;
+    }
+
+    for (let t = 0; t < triCount; t++) {
+        const i0 = indices[t * 3 + 0];
+        const i1 = indices[t * 3 + 1];
+        const i2 = indices[t * 3 + 2];
+
+        const edges = [edgeKey(i0, i1), edgeKey(i1, i2), edgeKey(i2, i0)];
+
+        for (const e of edges) {
+            let list = edgeMap.get(e);
+            if (!list) {
+                list = [];
+                edgeMap.set(e, list);
+            }
+            list.push(t);
+        }
+    }
+
+    // build adjacency
+    const adjacency: number[][] = Array.from({ length: triCount }, () => []);
+
+    for (const tris of edgeMap.values()) {
+        if (tris.length === 2) {
+            const [a, b] = tris;
+            adjacency[a].push(b);
+            adjacency[b].push(a);
+        }
+    }
+
+    return adjacency;
+}
+
+const VERTEX_STRIDE = 4;
+
+function buildMeshletsFromClusters(mesh: Mesh, clusters: number[][]): Mesh[] {
+    const srcPos = mesh.positions;
+    const srcIdx = mesh.indices;
+
+    const meshlets: Mesh[] = [];
+
+    for (const tris of clusters) {
+        const indexMap = new Map<number, number>();
+        const positions: number[] = [];
+        const indices: number[] = [];
+
+        function remap(v: number): number {
+            let idx = indexMap.get(v);
+            if (idx === undefined) {
+                idx = indexMap.size;
+                indexMap.set(v, idx);
+
+                const srcOffset = v * VERTEX_STRIDE;
+                const dstOffset = idx * VERTEX_STRIDE;
+
+                positions[dstOffset + 0] = srcPos[srcOffset + 0];
+                positions[dstOffset + 1] = srcPos[srcOffset + 1];
+                positions[dstOffset + 2] = srcPos[srcOffset + 2];
+                positions[dstOffset + 3] = srcPos[srcOffset + 3];
+            }
+            return idx;
+        }
+
+        for (const t of tris) {
+            const i0 = srcIdx[t * 3 + 0];
+            const i1 = srcIdx[t * 3 + 1];
+            const i2 = srcIdx[t * 3 + 2];
+
+            indices.push(remap(i0), remap(i1), remap(i2));
+        }
+
+        meshlets.push({
+            positions: new Float32Array(positions),
+            indices: new Uint32Array(indices),
+        });
+    }
+
+    return meshlets;
+}
+
+export async function clusterizeTriangles(mesh: Mesh): Promise<Mesh[]> {
+    const triCount = mesh.indices.length / 3;
+    const targetMeshlets = Math.ceil(triCount / 126);
+    const opts: MetisOptions = {};
+
+    const adjacency = buildTriangleAdjacency(mesh);
+
+    const clusters = await partitionGraph(adjacency, targetMeshlets, {
+        [METIS_OPTION.NUMBERING]: 0,
+        [METIS_OPTION.CONTIG]: 1,
+        [METIS_OPTION.UFACTOR]: 1,
+        ...opts,
+    });
+
+    return buildMeshletsFromClusters(mesh, clusters);
 }

@@ -44,7 +44,7 @@ struct VertexShaderOut {
     
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1);
-    out.index = task.instanceIndex * 1 + u32(vertex.group) * 1 + task.meshletIndex * 0;
+    out.index = task.instanceIndex * 1 + u32(vertex.group) * 0 + task.meshletIndex * 1;
     return out;
 }
 
