@@ -1,6 +1,6 @@
 /**
  * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger, January 2026
+ * Written by Noah Mattia Bussinger
  */
 
 #include structs.wgsl;
@@ -14,12 +14,8 @@ override SCREEN_HEIGHT: u32;
 @vertex fn vs(
     @builtin(vertex_index) vertexIndex: u32, 
 ) -> @builtin(position) vec4f {
-    let positions: array<vec2f, 3> = array<vec2f, 3>(
-        vec2f(-1, -3),
-        vec2f(3, 1),
-        vec2f(-1, 1)
-    );
-    return vec4f(positions[vertexIndex], 0, 1);
+    let uv: vec2u = vec2u((vertexIndex << 1) & 2, vertexIndex & 2);
+    return vec4f(vec2f(uv) * 2 - 1, 0, 1);
 }
 
 @fragment fn fs(

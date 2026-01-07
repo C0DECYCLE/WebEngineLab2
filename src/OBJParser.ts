@@ -3,8 +3,7 @@
  * Written by Noah Mattia Bussinger, October 2023
  */
 
-import { int, float, Nullable } from "../types/utilities/utils.type.js";
-import { log } from "./utilities/logger.js";
+import { float, int, Nullable } from "../types/utilities/utils.type.js";
 import { clear } from "./utilities/utils.js";
 import { Vec3 } from "./utilities/Vec3.js";
 
@@ -43,7 +42,6 @@ export class OBJParser {
         for (let i: int = 0; i < lines.length; ++i) {
             this.parseLine(regExp, lines[i].trim(), indexed, color);
         }
-        log(this.cache);
         const result: OBJParseResult = {
             vertices: new Float32Array(this.vertexCache),
             verticesCount:

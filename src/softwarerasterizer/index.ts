@@ -1,6 +1,6 @@
 /**
  * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger, January 2026
+ * Written by Noah Mattia Bussinger
  */
 
 import { Controller } from "../Controller.js";
@@ -12,13 +12,17 @@ import { Mat4 } from "../utilities/Mat4.js";
 import { assert, toRadian } from "../utilities/utils.js";
 import { float, int, Nullable, Undefinable } from "../utilities/utils.type.js";
 import { Vec3 } from "../utilities/Vec3.js";
+import { includeExternal, voxelizeOBJ } from "./helper.js";
 
 //////////// CONSTS ////////////
 
 const byteSize: int = 4;
 const instanceStride: int = 3 + 1;
 const instanceCount: int = 16;
-const spawnSize: int = 4;
+const spawnGrid: int = 4;
+const spawnScale: float = 4;
+const voxelSize: float = 0.1;
+const workgroupSize: int = 64;
 
 //////////// SETUP ////////////
 
@@ -66,42 +70,55 @@ const control: Controller = new Controller(canvas, {
 
 //////////// STATS ////////////
 
+const deltaNames: string[] = [
+    "cull",
+    "software0",
+    "software1",
+    "hardware",
+    "combine",
+];
+const deltas: Map<string, RollingAverage> = new Map<string, RollingAverage>();
 const stats: Stats = new Stats();
-stats.set("frame delta", 0);
-stats.set("software0 delta", 0);
-stats.set("software1 delta", 0);
-stats.set("hardware delta", 0);
-stats.set("combine delta", 0);
+deltas.set("frame", new RollingAverage(60));
+stats.set("frame" + " delta", 0);
+deltas.set("gpu", new RollingAverage(60));
+stats.set("gpu" + " delta", 0);
+for (const name of deltaNames) {
+    deltas.set(name, new RollingAverage(60));
+    stats.set(name + " delta", 0);
+}
 stats.show();
-const frameDelta: RollingAverage = new RollingAverage(60);
-const software0Delta: RollingAverage = new RollingAverage(60);
-const software1Delta: RollingAverage = new RollingAverage(60);
-const hardwareDelta: RollingAverage = new RollingAverage(60);
-const combineDelta: RollingAverage = new RollingAverage(60);
 
 //////////// UNIFORM ////////////
 
-const cameraData: Float32Array = new Float32Array(4 * 4);
+const cameraData: Float32Array = new Float32Array(4 + 4 * 4);
 const cameraBuffer: GPUBuffer = device.createBuffer({
     size: cameraData.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
-device!.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
+device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 
 //////////// GEOMETRY ////////////
 
-const data: OBJParseResult = await loadOBJ("./resources/book.obj");
+const data: OBJParseResult = await loadOBJ("./resources/house.obj");
+assert(data.indices && data.indicesCount);
+const voxelData: Float32Array = voxelizeOBJ(data, voxelSize);
+const voxelBuffer: GPUBuffer = device.createBuffer({
+    size: voxelData.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+device.queue.writeBuffer(voxelBuffer, 0, voxelData.buffer);
 const vertexBuffer: GPUBuffer = device.createBuffer({
     size: data.vertices.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 device.queue.writeBuffer(vertexBuffer, 0, data.vertices.buffer);
 const indexBuffer: GPUBuffer = device.createBuffer({
-    size: data.indices!.byteLength,
+    size: data.indices.byteLength,
     usage:
         GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
 });
-device.queue.writeBuffer(indexBuffer, 0, data.indices!.buffer);
+device.queue.writeBuffer(indexBuffer, 0, data.indices.buffer);
 
 //////////// INSTANCES ////////////
 
@@ -109,10 +126,10 @@ const instancesData: Float32Array = new Float32Array(
     instanceCount * instanceStride,
 );
 for (let i: int = 0; i < instanceCount; i++) {
-    let x: float = i % spawnSize;
-    let y: float = Math.floor(i / (spawnSize * spawnSize));
-    let z: float = Math.floor(i / spawnSize) % spawnSize;
-    let position: Vec3 = new Vec3(x, y, z).scale(3);
+    let x: float = i % spawnGrid;
+    let y: float = Math.floor(i / (spawnGrid * spawnGrid));
+    let z: float = Math.floor(i / spawnGrid) % spawnGrid;
+    let position: Vec3 = new Vec3(x, y, z).scale(spawnScale);
     position.store(instancesData, i * instanceStride);
 }
 const instancesBuffer: GPUBuffer = device.createBuffer({
@@ -123,18 +140,58 @@ device.queue.writeBuffer(instancesBuffer, 0, instancesData.buffer);
 
 //////////// SOFTWARE ////////////
 
-const cacheBuffer: GPUBuffer = device.createBuffer({
-    size: 1024 * 64 * (3 + 1) * byteSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-});
-const argsBuffer: GPUBuffer = device.createBuffer({
+const software0ArgsBuffer: GPUBuffer = device.createBuffer({
     size: 3 * byteSize,
     usage:
         GPUBufferUsage.STORAGE |
         GPUBufferUsage.COPY_DST |
         GPUBufferUsage.INDIRECT,
 });
-device.queue.writeBuffer(argsBuffer, 0, new Uint32Array([0, 1, 1]).buffer);
+const voxelCount: int = voxelData.length / 8;
+device.queue.writeBuffer(
+    software0ArgsBuffer,
+    0,
+    new Uint32Array([Math.ceil(voxelCount / workgroupSize), 0, 1]).buffer,
+);
+const software1ArgsBuffer: GPUBuffer = device.createBuffer({
+    size: 3 * byteSize,
+    usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.INDIRECT,
+});
+device.queue.writeBuffer(
+    software1ArgsBuffer,
+    0,
+    new Uint32Array([0, 1, 1]).buffer,
+);
+const softwareInstancesBuffer: GPUBuffer = device.createBuffer({
+    size: instanceCount * 1 * byteSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+const cacheBuffer: GPUBuffer = device.createBuffer({
+    size: 1024 * 64 * (3 + 1) * byteSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+
+//////////// HARDWARE ////////////
+
+const hardwareArgsBuffer: GPUBuffer = device.createBuffer({
+    size: 5 * byteSize,
+    usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.INDIRECT,
+});
+device.queue.writeBuffer(
+    hardwareArgsBuffer,
+    0,
+    new Uint32Array([data.indicesCount, 0, 0, 0, 0]).buffer,
+);
+const hardwareInstancesBuffer: GPUBuffer = device.createBuffer({
+    size: instanceCount * 1 * byteSize,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
 
 //////////// FRAME ////////////
 
@@ -145,7 +202,7 @@ const frameBuffer: GPUBuffer = device.createBuffer({
 
 //////////// GPU TIMING ////////////
 
-const capacity: int = 8;
+const capacity: int = deltaNames.length * 2;
 const querySet: GPUQuerySet = device.createQuerySet({
     type: "timestamp",
     count: capacity,
@@ -165,24 +222,9 @@ const queryReadbackBuffer: GPUBuffer = device.createBuffer({
 
 //////////// SHADER ////////////
 
-const directory: string = "./shaders/softwarerasterizer/";
-const includesDirectory: string = "./shaders/softwarerasterizer/includes/";
-const key: string = "#include";
-
-async function includeExternal(file: string): Promise<string> {
-    const source: string = await (await fetch(directory + file)).text();
-    const lines: string[] = source.split("\n");
-    for (let i: int = 0; i < lines.length; i++) {
-        const line: string = lines[i];
-        if (!line.startsWith(key)) {
-            continue;
-        }
-        const subfile: string = line.split(key)[1].trim().split(";")[0];
-        lines[i] = await (await fetch(includesDirectory + subfile)).text();
-    }
-    return lines.join("\n");
-}
-
+const cullShader: GPUShaderModule = device.createShaderModule({
+    code: await includeExternal("cull.wgsl"),
+});
 const software0Shader: GPUShaderModule = device.createShaderModule({
     code: await includeExternal("software0.wgsl"),
 });
@@ -198,6 +240,16 @@ const combineShader: GPUShaderModule = device.createShaderModule({
 
 //////////// PIPELINE ////////////
 
+const cullPipeline: GPUComputePipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+        module: cullShader,
+        entryPoint: "cs",
+        constants: {
+            WORKGROUP_SIZE: workgroupSize,
+        },
+    },
+});
 const software0Pipeline: GPUComputePipeline = device.createComputePipeline({
     layout: "auto",
     compute: {
@@ -206,6 +258,7 @@ const software0Pipeline: GPUComputePipeline = device.createComputePipeline({
         constants: {
             SCREEN_WIDTH: canvas.width,
             SCREEN_HEIGHT: canvas.height,
+            WORKGROUP_SIZE_X: workgroupSize,
         },
     },
 });
@@ -258,13 +311,26 @@ const combinePipeline: GPURenderPipeline = device.createRenderPipeline({
 
 //////////// BINDGROUP ////////////
 
+const cullBindGroup: GPUBindGroup = device.createBindGroup({
+    layout: cullPipeline.getBindGroupLayout(0),
+    entries: [
+        { binding: 0, resource: cameraBuffer },
+        { binding: 1, resource: instancesBuffer },
+        { binding: 2, resource: software0ArgsBuffer },
+        { binding: 3, resource: softwareInstancesBuffer },
+        { binding: 4, resource: hardwareArgsBuffer },
+        { binding: 5, resource: hardwareInstancesBuffer },
+    ],
+});
 const software0BindGroup: GPUBindGroup = device.createBindGroup({
     layout: software0Pipeline.getBindGroupLayout(0),
     entries: [
         { binding: 0, resource: cameraBuffer },
-        { binding: 1, resource: vertexBuffer },
-        { binding: 2, resource: argsBuffer },
-        { binding: 3, resource: cacheBuffer },
+        { binding: 1, resource: voxelBuffer },
+        { binding: 2, resource: instancesBuffer },
+        { binding: 3, resource: softwareInstancesBuffer },
+        { binding: 4, resource: software1ArgsBuffer },
+        { binding: 5, resource: cacheBuffer },
     ],
 });
 const software1BindGroup: GPUBindGroup = device.createBindGroup({
@@ -280,7 +346,8 @@ const hardwareBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 0, resource: cameraBuffer },
         { binding: 1, resource: vertexBuffer },
         { binding: 2, resource: instancesBuffer },
-        { binding: 3, resource: frameBuffer },
+        { binding: 3, resource: hardwareInstancesBuffer },
+        { binding: 4, resource: frameBuffer },
     ],
 });
 const combineBindGroup: GPUBindGroup = device.createBindGroup({
@@ -291,13 +358,14 @@ const combineBindGroup: GPUBindGroup = device.createBindGroup({
 //////////// RENDER FRAME ////////////
 
 function frame(now: float): void {
-    assert(context && device);
+    assert(context && device && data.indices && data.indicesCount);
 
     //////////// UPDATE ////////////
 
     control.update();
+    cameraPos.store(cameraData, 0);
     cameraView.view(cameraPos, cameraDir, up);
-    viewProjection.multiply(cameraView, projection).store(cameraData, 0);
+    viewProjection.multiply(cameraView, projection).store(cameraData, 4);
     device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 
     //////////// ENCODE ////////////
@@ -306,32 +374,45 @@ function frame(now: float): void {
 
     const encoder: GPUCommandEncoder = device.createCommandEncoder();
 
-    encoder.clearBuffer(argsBuffer, 0, 1 * byteSize);
+    encoder.clearBuffer(software0ArgsBuffer, 1 * byteSize, 1 * byteSize);
+    encoder.clearBuffer(software1ArgsBuffer, 0 * byteSize, 1 * byteSize);
+    encoder.clearBuffer(hardwareArgsBuffer, 1 * byteSize, 1 * byteSize);
     encoder.clearBuffer(frameBuffer);
 
-    const software0Pass: GPUComputePassEncoder = encoder.beginComputePass({
+    const cullPass: GPUComputePassEncoder = encoder.beginComputePass({
         timestampWrites: {
             querySet: querySet,
             beginningOfPassWriteIndex: 0,
             endOfPassWriteIndex: 1,
         },
     });
-    software0Pass.setPipeline(software0Pipeline);
-    software0Pass.setBindGroup(0, software0BindGroup);
-    const num: int = Math.floor(data.verticesCount / 1);
-    software0Pass.dispatchWorkgroups(Math.ceil(num / 64));
-    software0Pass.end();
+    cullPass.setPipeline(cullPipeline);
+    cullPass.setBindGroup(0, cullBindGroup);
+    cullPass.dispatchWorkgroups(Math.ceil(instanceCount / workgroupSize));
+    cullPass.end();
 
-    const software1Pass: GPUComputePassEncoder = encoder.beginComputePass({
+    const software0Pass: GPUComputePassEncoder = encoder.beginComputePass({
         timestampWrites: {
             querySet: querySet,
             beginningOfPassWriteIndex: 2,
             endOfPassWriteIndex: 3,
         },
     });
+    software0Pass.setPipeline(software0Pipeline);
+    software0Pass.setBindGroup(0, software0BindGroup);
+    software0Pass.dispatchWorkgroupsIndirect(software0ArgsBuffer, 0);
+    software0Pass.end();
+
+    const software1Pass: GPUComputePassEncoder = encoder.beginComputePass({
+        timestampWrites: {
+            querySet: querySet,
+            beginningOfPassWriteIndex: 4,
+            endOfPassWriteIndex: 5,
+        },
+    });
     software1Pass.setPipeline(software1Pipeline);
     software1Pass.setBindGroup(0, software1BindGroup);
-    software1Pass.dispatchWorkgroupsIndirect(argsBuffer, 0);
+    software1Pass.dispatchWorkgroupsIndirect(software1ArgsBuffer, 0);
     software1Pass.end();
 
     const hardwarePass: GPURenderPassEncoder = encoder.beginRenderPass({
@@ -345,14 +426,14 @@ function frame(now: float): void {
         ],
         timestampWrites: {
             querySet: querySet,
-            beginningOfPassWriteIndex: 4,
-            endOfPassWriteIndex: 5,
+            beginningOfPassWriteIndex: 6,
+            endOfPassWriteIndex: 7,
         },
     });
     hardwarePass.setPipeline(hardwarePipeline);
     hardwarePass.setBindGroup(0, hardwareBindGroup);
     hardwarePass.setIndexBuffer(indexBuffer, "uint32");
-    hardwarePass.drawIndexed(data.indicesCount!, instanceCount);
+    hardwarePass.drawIndexedIndirect(hardwareArgsBuffer, 0);
     hardwarePass.end();
 
     const combinePass: GPURenderPassEncoder = encoder.beginRenderPass({
@@ -366,8 +447,8 @@ function frame(now: float): void {
         ],
         timestampWrites: {
             querySet: querySet,
-            beginningOfPassWriteIndex: 6,
-            endOfPassWriteIndex: 7,
+            beginningOfPassWriteIndex: 8,
+            endOfPassWriteIndex: 9,
         },
     });
     combinePass.setPipeline(combinePipeline);
@@ -390,51 +471,46 @@ function frame(now: float): void {
 
     if (queryReadbackBuffer.mapState === "unmapped") {
         queryReadbackBuffer.mapAsync(GPUMapMode.READ).then(() => {
-            const timingsNanoseconds: BigInt64Array = new BigInt64Array(
-                queryReadbackBuffer.getMappedRange().slice(0),
-            );
+            const arrayBuffer: ArrayBuffer = queryReadbackBuffer
+                .getMappedRange()
+                .slice(0);
             queryReadbackBuffer.unmap();
-            stats.set(
-                "software0 delta",
-                Number(timingsNanoseconds[1] - timingsNanoseconds[0]) /
-                    1_000_000,
+            const timingsNanoseconds: BigInt64Array = new BigInt64Array(
+                arrayBuffer,
             );
-            software0Delta.sample(stats.get("software0 delta")!);
-            stats.set(
-                "software1 delta",
-                Number(timingsNanoseconds[3] - timingsNanoseconds[2]) /
-                    1_000_000,
+            const timings: float[] = Array.from(timingsNanoseconds).map(
+                (value: bigint) => Number(value) / 1_000_000,
             );
-            software1Delta.sample(stats.get("software1 delta")!);
-            stats.set(
-                "hardware delta",
-                Number(timingsNanoseconds[5] - timingsNanoseconds[4]) /
-                    1_000_000,
-            );
-            hardwareDelta.sample(stats.get("hardware delta")!);
-            stats.set(
-                "combine delta",
-                Number(timingsNanoseconds[7] - timingsNanoseconds[6]) /
-                    1_000_000,
-            );
-            combineDelta.sample(stats.get("combine delta")!);
+            let min: float = Math.min(...timings);
+            let max: float = Math.max(...timings);
+            stats.set("gpu" + " delta", max - min);
+            deltas.get("gpu")!.sample(stats.get("gpu" + " delta")!);
+            for (let i: int = 0; i < deltaNames.length; i++) {
+                const name: string = deltaNames[i];
+                const a: float = timings[i * 2 + 0];
+                const b: float = timings[i * 2 + 1];
+                stats.set(name + " delta", b - a);
+                deltas.get(name)!.sample(stats.get(name + " delta")!);
+            }
         });
     }
 
     //////////// STATS ////////////
 
     stats.set("frame delta", now - stats.get("frame delta")!);
-    frameDelta.sample(stats.get("frame delta")!);
+    deltas.get("frame")!.sample(stats.get("frame delta")!);
     // prettier-ignore
     stats.update(`
-        <b>frame rate: ${(1_000 / frameDelta.get()).toFixed(0)} fps</b><br>
-        frame delta: ${frameDelta.get().toFixed(2)} ms<br>
+        <b>frame rate: ${(1_000 / deltas.get("frame")!.get()).toFixed(0)} fps</b><br>
+        frame delta: ${deltas.get("frame")!.get().toFixed(2)} ms<br>
+        gpu delta: ${deltas.get("gpu")!.get().toFixed(2)} ms<br>
         <br>
-        <b>software0 delta: ${software0Delta.get().toFixed(2)} ms<b><br>
-        <b>software1 delta: ${software1Delta.get().toFixed(2)} ms<b><br>
-        <b>hardware delta: ${hardwareDelta.get().toFixed(2)} ms<b><br>
-        <b>combine delta: ${combineDelta.get().toFixed(2)} ms<b><br>
-    `);
+        <b>cull delta: ${deltas.get("cull")!.get().toFixed(2)} ms<b><br>
+        <b>software0 delta: ${deltas.get("software0")!.get().toFixed(2)} ms<b><br>
+        <b>software1 delta: ${deltas.get("software1")!.get().toFixed(2)} ms<b><br>
+        <b>hardware delta: ${deltas.get("hardware")!.get().toFixed(2)} ms<b><br>
+        <b>combine delta: ${deltas.get("combine")!.get().toFixed(2)} ms<b><br>
+        `);
     stats.set("frame delta", now);
 
     requestAnimationFrame(frame);

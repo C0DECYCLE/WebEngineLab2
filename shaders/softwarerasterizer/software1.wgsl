@@ -1,6 +1,6 @@
 /**
  * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger, January 2026
+ * Written by Noah Mattia Bussinger
  */
 
 #include structs.wgsl;

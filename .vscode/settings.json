@@ -10,7 +10,10 @@
         "ensurance",
         "floatingorigin",
         "fragmentspace",
+        "instancebatching",
         "persistentthreads",
-        "Readback"
+        "Readback",
+        "softwarerasterizer",
+        "voxelize"
     ]
 }
