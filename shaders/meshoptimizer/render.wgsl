@@ -27,6 +27,7 @@ struct Vertex {
 struct VertexShaderOut {
     @builtin(position) position: vec4f,
     @interpolate(flat) @location(0) index: u32,
+    @interpolate(flat) @location(1) index2: u32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -34,7 +35,10 @@ struct VertexShaderOut {
 @group(0) @binding(2) var<storage, read> instances: array<Instance>;
 @group(0) @binding(3) var<storage, read> tasks: array<Task>;
 
-@vertex fn vs(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) instanceIndex: u32) -> VertexShaderOut {
+@vertex fn vs(
+    @builtin(vertex_index) vertexIndex: u32, 
+    @builtin(instance_index) instanceIndex: u32
+) -> VertexShaderOut {
     let task: Task = tasks[instanceIndex];
     let instance: Instance = instances[task.instanceIndex];
     let vertex: Vertex = vertices[task.meshletIndex * 128 * 3 + vertexIndex];
@@ -44,12 +48,17 @@ struct VertexShaderOut {
     
     var out: VertexShaderOut;
     out.position = uniforms.viewProjection * vec4f(position, 1);
-    out.index = task.instanceIndex * 1 + u32(vertex.group) * 0 + task.meshletIndex * 1;
+    out.index = task.instanceIndex * 1 + u32(vertex.group) * 1 + task.meshletIndex * 0;
+    out.index2 = task.instanceIndex * 1 + u32(vertex.group) * 1 + task.meshletIndex * 1;
     return out;
 }
 
-@fragment fn fs(@builtin(primitive_index) primitiveIndex: u32, @interpolate(flat) @location(0) index: u32) -> @location(0) vec4f {
-    return vec4f(random(f32(index + primitiveIndex * 0)), 1);
+@fragment fn fs(
+    @builtin(primitive_index) primitiveIndex: u32, 
+    @interpolate(flat) @location(0) index: u32,
+    @interpolate(flat) @location(1) index2: u32,
+) -> @location(0) vec4f {
+    return vec4f(random(f32(index + primitiveIndex * 0)) * 0.0 + random(f32(index2 + primitiveIndex * 0)) * 1.0, 1);
 }
 
 fn random(value: f32) -> vec3f {

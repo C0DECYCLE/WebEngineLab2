@@ -24,7 +24,11 @@ import {
 } from "../../../node_modules/meshoptimizer/meshopt_clusterizer.module.js";
  */
 import { loadOBJ } from "../instancebatching/helper.js";
-import { clusterizeTriangles, Mesh } from "./clusterize.js";
+import {
+    clusterizeTriangles,
+    Mesh,
+    TriangleClusteringResult,
+} from "./clusterize.js";
 import { groupClusters } from "./group.js";
 
 function createCanvas(): HTMLCanvasElement {
@@ -189,7 +193,11 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
 // /*
 const now: float = performance.now();
-const meshlets: Mesh[] = await clusterizeTriangles({
+const {
+    meshlets,
+    clusters, // triangle indices per meshlet
+    triangleAdjacency, // triangle adjacency
+}: TriangleClusteringResult = await clusterizeTriangles({
     positions: data.vertices,
     indices: data.indices!,
 });
@@ -197,9 +205,11 @@ log("clusterize", performance.now() - now, "ms");
 
 const meshletToGroup: int[] = [];
 const now2: float = performance.now();
-const groups = await groupClusters(meshlets);
+const groups = await groupClusters(meshlets, clusters, triangleAdjacency);
 log("group", performance.now() - now2, "ms");
+const gStat: Uint32Array = new Uint32Array(100);
 for (let g: int = 0; g < groups.length; g++) {
+    gStat[groups[g].length]++;
     groups[g].forEach((meshletIndex) => (meshletToGroup[meshletIndex] = g));
 }
 
@@ -208,7 +218,7 @@ const verticesCount: int = meshletsCount * maxTriangles * numVertices;
 const verticesData: Float32Array = new Float32Array(
     verticesCount * vertexStride,
 );
-let stat: Uint32Array = new Uint32Array(maxTriangles + 1);
+const stat: Uint32Array = new Uint32Array(1000);
 for (let m: int = 0; m < meshletsCount; m++) {
     const group: int = meshletToGroup[m];
     const indices: Uint32Array = meshlets[m].indices;
@@ -231,9 +241,16 @@ for (let m: int = 0; m < meshletsCount; m++) {
         }
     }
 }
+log("cluster stats:");
 for (let i: int = 0; i < stat.length; i++) {
     if (stat[i] !== 0) {
         log(i + ": " + stat[i]);
+    }
+}
+log("group stats:");
+for (let i: int = 0; i < gStat.length; i++) {
+    if (gStat[i] !== 0) {
+        log(i + ": " + gStat[i]);
     }
 }
 // */

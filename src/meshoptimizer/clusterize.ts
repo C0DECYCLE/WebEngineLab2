@@ -3,11 +3,7 @@
  * Written by Noah Mattia Bussinger
  */
 
-import {
-    METIS_OPTION,
-    MetisOptions,
-    partitionGraph,
-} from "./METISb/partitionGraph.js";
+import { METIS_OPTION, partitionGraph } from "./METISb/partitionGraph.js";
 
 //import { log } from "../utilities/logger.js";
 
@@ -256,13 +252,13 @@ type WeightedAdjacency = {
     xadj: number[];
     adjncy: number[];
     adjwgt: number[];
+    triangleAdjacency: number[][];
 };
 
 function buildWeightedTriangleAdjacency(mesh: Mesh): WeightedAdjacency {
     const indices = mesh.indices;
     const triCount = indices.length / 3;
 
-    // Map edge -> triangles
     const edgeMap = new Map<string, number[]>();
 
     function edgeKey(a: number, b: number) {
@@ -282,34 +278,33 @@ function buildWeightedTriangleAdjacency(mesh: Mesh): WeightedAdjacency {
             edgeMap.set(edgeKey(i2, i0), [t]);
     }
 
-    const adjacency: number[][] = Array.from({ length: triCount }, () => []);
+    const triangleAdjacency: number[][] = Array.from(
+        { length: triCount },
+        () => [],
+    );
     const weights: number[][] = Array.from({ length: triCount }, () => []);
 
     for (const tris of edgeMap.values()) {
         if (tris.length === 2) {
             const [a, b] = tris;
-
-            // shared vertices = 2 (by construction)
-            adjacency[a].push(b);
+            triangleAdjacency[a].push(b);
+            triangleAdjacency[b].push(a);
             weights[a].push(2);
-
-            adjacency[b].push(a);
             weights[b].push(2);
         }
     }
 
-    // Flatten into METIS format
     const xadj: number[] = [0];
     const adjncy: number[] = [];
     const adjwgt: number[] = [];
 
     for (let i = 0; i < triCount; i++) {
-        adjncy.push(...adjacency[i]);
+        adjncy.push(...triangleAdjacency[i]);
         adjwgt.push(...weights[i]);
         xadj.push(adjncy.length);
     }
 
-    return { xadj, adjncy, adjwgt };
+    return { xadj, adjncy, adjwgt, triangleAdjacency };
 }
 
 function buildMeshletsFromClusters(mesh: Mesh, clusters: number[][]): Mesh[] {
@@ -358,11 +353,20 @@ function buildMeshletsFromClusters(mesh: Mesh, clusters: number[][]): Mesh[] {
     return meshlets;
 }
 
-export async function clusterizeTriangles(mesh: Mesh): Promise<Mesh[]> {
+export type TriangleClusteringResult = {
+    meshlets: Mesh[];
+    clusters: number[][]; // triangle indices per meshlet
+    triangleAdjacency: number[][]; // triangle → triangle adjacency
+};
+
+export async function clusterizeTriangles(
+    mesh: Mesh,
+): Promise<TriangleClusteringResult> {
     const triCount = mesh.indices.length / 3;
     const nparts = Math.ceil(triCount / 126);
 
-    const { xadj, adjncy, adjwgt } = buildWeightedTriangleAdjacency(mesh);
+    const { xadj, adjncy, adjwgt, triangleAdjacency } =
+        buildWeightedTriangleAdjacency(mesh);
 
     const clusters = await partitionGraph(xadj, adjncy, adjwgt, nparts, {
         [METIS_OPTION.NUMBERING]: 0,
@@ -370,5 +374,11 @@ export async function clusterizeTriangles(mesh: Mesh): Promise<Mesh[]> {
         [METIS_OPTION.UFACTOR]: 1,
     });
 
-    return buildMeshletsFromClusters(mesh, clusters);
+    const meshlets = buildMeshletsFromClusters(mesh, clusters);
+
+    return {
+        meshlets,
+        clusters, // <-- THIS is clusterTriangles
+        triangleAdjacency, // <-- THIS is triangleAdjacency
+    };
 }

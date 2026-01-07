@@ -3,8 +3,8 @@
  * Written by Noah Mattia Bussinger
  */
 
-import { Mesh } from "./clusterize";
-import { METIS_OPTION, partitionGraph } from "./METISb/partitionGraph";
+import { Mesh } from "./clusterize.js";
+import { METIS_OPTION, partitionGraph } from "./METISb/partitionGraph.js";
 
 //import { log } from "../utilities/logger.js";
 
@@ -269,7 +269,7 @@ export async function groupClusters(
     triangleAdjacency: number[][],
 ): Promise<number[][]> {
     const clusterCount = meshlets.length;
-    const nparts = Math.ceil(clusterCount / 8);
+    const nparts = Math.ceil(clusterCount / 7);
 
     const topoEdges = buildClusterAdjacencyFromTopology(
         triangleAdjacency,
