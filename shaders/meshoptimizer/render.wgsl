@@ -58,7 +58,9 @@ struct VertexShaderOut {
     @interpolate(flat) @location(0) index: u32,
     @interpolate(flat) @location(1) index2: u32,
 ) -> @location(0) vec4f {
-    return vec4f(random(f32(index + primitiveIndex * 0)) * 0.0 + random(f32(index2 + primitiveIndex * 0)) * 1.0, 1);
+    //return vec4f(random(f32(index2 + primitiveIndex * 0)), 1);
+    return vec4f(random(f32(index2 + primitiveIndex * 0)) * 0.9 + random(f32(index2 + primitiveIndex * 1)) * 0.1, 1);
+    //return vec4f(random(f32(index + primitiveIndex * 0)) * 0.9 + random(f32(index2 + primitiveIndex * 0)) * 0.1, 1);
 }
 
 fn random(value: f32) -> vec3f {

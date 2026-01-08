@@ -24,11 +24,7 @@ import {
 } from "../../../node_modules/meshoptimizer/meshopt_clusterizer.module.js";
  */
 import { loadOBJ } from "../instancebatching/helper.js";
-import {
-    clusterizeTriangles,
-    Mesh,
-    TriangleClusteringResult,
-} from "./clusterize.js";
+import { clusterizeTriangles, TriangleClusteringResult } from "./clusterize.js";
 import { groupClusters } from "./group.js";
 
 function createCanvas(): HTMLCanvasElement {
@@ -190,7 +186,7 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
 //////////// VERTICES ////////////
 
-const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
+const data: OBJParseResult = await loadOBJ("./resources/bakery.obj");
 // /*
 const now: float = performance.now();
 const {
