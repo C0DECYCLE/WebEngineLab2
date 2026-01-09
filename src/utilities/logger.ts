@@ -1,9 +1,9 @@
 /**
  * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger, October 2023
+ * Written by Noah Mattia Bussinger
  */
 
-import { int } from "../../types/utilities/utils.type.js";
+import { int } from "./utils.type.js";
 
 export function log(...data: any[]): void {
     return logger("log", ...data);
@@ -13,14 +13,20 @@ export function warn(...data: any[]): void {
     return logger("warn", ...data);
 }
 
-const logger_maximum: int = 256;
+export const logger_archive: string[] = [];
+const logger_maximum: int = 512;
 let logger_count: int = 0;
+let logger_exit: boolean = false;
 
 function logger(type: "log" | "warn", ...data: any[]): void {
-    logger_count++;
-    if (logger_count === logger_maximum + 1) {
-        return console.warn("Logger: Maximum count exeeded.");
-    } else if (logger_count < logger_maximum + 1) {
-        return console[type](...data);
+    if (logger_exit) {
+        return;
     }
+    if (logger_count === logger_maximum) {
+        logger_exit = true;
+        return console.warn("Logger: Maximum count exceeded.");
+    }
+    logger_count++;
+    logger_archive.push(data.toString());
+    console[type](...data);
 }

@@ -5,7 +5,7 @@
 
 import { OBJParseResult } from "../OBJParser.js";
 import { assert } from "../utilities/utils.js";
-import { float, int } from "../utilities/utils.type.js";
+import { int } from "../utilities/utils.type.js";
 
 //////////// VOXEL ////////////
 
@@ -219,14 +219,4 @@ export async function includeExternal(file: string): Promise<string> {
         lines[i] = await (await fetch(includesDirectory + subfile)).text();
     }
     return lines.join("\n");
-}
-
-//////////// STATS ////////////
-
-export function toDelta(
-    timingsNanoseconds: BigInt64Array,
-    a: int,
-    b: int,
-): float {
-    return Number(timingsNanoseconds[b] - timingsNanoseconds[a]) / 1_000_000;
 }

@@ -1,20 +1,21 @@
 /**
  * Copyright (C) - All Rights Reserved
- * Written by Noah Mattia Bussinger, October 2023
+ * Written by Noah Mattia Bussinger
  */
 
-import { int, float, FloatArray } from "../../types/utilities/utils.type.js";
+import { int, float, Nullable, FloatArray } from "./utils.type.js";
+import { Mat2 } from "./Mat2.js";
+import { Mat3 } from "./Mat3.js";
 import { Vec3 } from "./Vec3.js";
+import { normalizeRadian } from "./utils.js";
 
 export class Mat4 {
     public static Cache: Mat4 = new Mat4();
 
-    public readonly values: Float32Array | Float64Array;
-    public readonly isFloat64: boolean;
+    public readonly values: Float32Array;
 
-    public constructor(isFloat64: boolean = false) {
-        this.values = isFloat64 ? new Float64Array(16) : new Float32Array(16);
-        this.isFloat64 = isFloat64;
+    public constructor() {
+        this.values = new Float32Array(16);
         this.reset();
     }
 
@@ -48,339 +49,170 @@ export class Mat4 {
         );
     }
 
-    public translate(x: Vec3 | float, y?: float, z?: float): Mat4 {
+    public translate(
+        x: Vec3 | float,
+        y: Nullable<float> = null,
+        z: Nullable<float> = null,
+    ): Mat4 {
         if (x instanceof Vec3) {
             z = x.z;
             y = x.y;
             x = x.x;
-        } else if (y === undefined || z === undefined) {
+        } else if (y === null || z === null) {
             z = x;
             y = x;
         }
-        if (x === 0 && y === 0 && z === 0) {
-            return this;
-        }
-        const n00: float = this.values[0];
-        const n01: float = this.values[1];
-        const n02: float = this.values[2];
-        const n03: float = this.values[3];
-        const n10: float = this.values[4];
-        const n11: float = this.values[5];
-        const n12: float = this.values[6];
-        const n13: float = this.values[7];
-        const n20: float = this.values[8];
-        const n21: float = this.values[9];
-        const n22: float = this.values[10];
-        const n23: float = this.values[11];
-        const n30: float = this.values[12];
-        const n31: float = this.values[13];
-        const n32: float = this.values[14];
-        const n33: float = this.values[15];
-
+        const v: Float32Array = this.values;
         // prettier-ignore
-        this.values[12] = n00 * (x as float) + n10 * (y as float) + n20 * (z as float) + n30;
-        // prettier-ignore
-        this.values[13] = n01 * (x as float) + n11 * (y as float) + n21 * (z as float) + n31;
-        // prettier-ignore
-        this.values[14] = n02 * (x as float) + n12 * (y as float) + n22 * (z as float) + n32;
-        // prettier-ignore
-        this.values[15] = n03 * (x as float) + n13 * (y as float) + n23 * (z as float) + n33;
-
-        return this;
+        return this.set(
+            v[0], v[1], v[2], v[3],
+            v[4], v[5], v[6], v[7],
+            v[8], v[9], v[10], v[11],
+            v[0] * x + v[4] * y + v[8] * z + v[12], v[1] * x + v[5] * y + v[9] * z + v[13], v[2] * x + v[6] * y + v[10] * z + v[14], v[3] * x + v[7] * y + v[11] * z + v[15],
+        );
     }
 
     public rotateX(radian: float): Mat4 {
-        if (radian === 0) {
-            return this;
-        }
-        const n10: float = this.values[4];
-        const n11: float = this.values[5];
-        const n12: float = this.values[6];
-        const n13: float = this.values[7];
-        const n20: float = this.values[8];
-        const n21: float = this.values[9];
-        const n22: float = this.values[10];
-        const n23: float = this.values[11];
-
+        radian = normalizeRadian(radian);
         const c: float = Math.cos(radian);
         const s: float = Math.sin(radian);
-
-        this.values[4] = c * n10 + s * n20;
-        this.values[5] = c * n11 + s * n21;
-        this.values[6] = c * n12 + s * n22;
-        this.values[7] = c * n13 + s * n23;
-        this.values[8] = c * n20 - s * n10;
-        this.values[9] = c * n21 - s * n11;
-        this.values[10] = c * n22 - s * n12;
-        this.values[11] = c * n23 - s * n13;
-
-        return this;
+        const v: Float32Array = this.values;
+        // prettier-ignore
+        return this.set(
+            v[0], v[1], v[2], v[3],
+            c * v[4] + s * v[8], c * v[5] + s * v[9], c * v[6] + s * v[10], c * v[7] + s * v[11],
+            c * v[8] - s * v[4], c * v[9] - s * v[5], c * v[10] - s * v[6], c * v[11] - s * v[7],
+            v[12], v[13], v[14], v[15],
+        );
     }
 
     public rotateY(radian: float): Mat4 {
-        if (radian === 0) {
-            return this;
-        }
-        const n00: float = this.values[0];
-        const n01: float = this.values[1];
-        const n02: float = this.values[2];
-        const n03: float = this.values[3];
-        const n20: float = this.values[8];
-        const n21: float = this.values[9];
-        const n22: float = this.values[10];
-        const n23: float = this.values[11];
-
+        radian = normalizeRadian(radian);
         const c: float = Math.cos(radian);
         const s: float = Math.sin(radian);
-
-        this.values[0] = c * n00 - s * n20;
-        this.values[1] = c * n01 - s * n21;
-        this.values[2] = c * n02 - s * n22;
-        this.values[3] = c * n03 - s * n23;
-        this.values[8] = c * n20 + s * n00;
-        this.values[9] = c * n21 + s * n01;
-        this.values[10] = c * n22 + s * n02;
-        this.values[11] = c * n23 + s * n03;
-
-        return this;
+        const v: Float32Array = this.values;
+        // prettier-ignore
+        return this.set(
+            c * v[0] - s * v[8], c * v[1] - s * v[9], c * v[2] - s * v[10], c * v[3] - s * v[11],
+            v[4], v[5], v[6], v[7],
+            c * v[8] + s * v[0], c * v[9] + s * v[1], c * v[10] + s * v[2], c * v[11] + s * v[3],
+            v[12], v[13], v[14], v[15],
+        );
     }
 
     public rotateZ(radian: float): Mat4 {
-        if (radian === 0) {
-            return this;
-        }
-        const n00: float = this.values[0];
-        const n01: float = this.values[1];
-        const n02: float = this.values[2];
-        const n03: float = this.values[3];
-        const n10: float = this.values[4];
-        const n11: float = this.values[5];
-        const n12: float = this.values[6];
-        const n13: float = this.values[7];
-
+        radian = normalizeRadian(radian);
         const c: float = Math.cos(radian);
         const s: float = Math.sin(radian);
-
-        this.values[0] = c * n00 + s * n10;
-        this.values[1] = c * n01 + s * n11;
-        this.values[2] = c * n02 + s * n12;
-        this.values[3] = c * n03 + s * n13;
-        this.values[4] = c * n10 - s * n00;
-        this.values[5] = c * n11 - s * n01;
-        this.values[6] = c * n12 - s * n02;
-        this.values[7] = c * n13 - s * n03;
-
-        return this;
+        const v: Float32Array = this.values;
+        // prettier-ignore
+        return this.set(
+            c * v[0] + s * v[4], c * v[1] + s * v[5], c * v[2] + s * v[6], c * v[3] + s * v[7],
+            c * v[4] - s * v[0], c * v[5] - s * v[1], c * v[6] - s * v[2], c * v[7] - s * v[3],
+            v[8], v[9], v[10], v[11],
+            v[12], v[13], v[14], v[15],
+        );
     }
 
     public rotateAxis(normal: Vec3, radian: float): Mat4 {
-        if (radian === 0) {
-            return this;
-        }
-        const x: float = normal.x;
-        const y: float = normal.y;
-        const z: float = normal.z;
-
-        const xx: float = x * x;
-        const yy: float = y * y;
-        const zz: float = z * z;
-
+        radian = normalizeRadian(radian);
+        const xx: float = normal.x * normal.x;
+        const yy: float = normal.y * normal.y;
+        const zz: float = normal.z * normal.z;
         const c: float = Math.cos(radian);
-        const s: float = Math.sin(radian);
         const cI: float = 1.0 - c;
-
-        const r00: float = xx + (1 - xx) * c;
-        const r01: float = x * y * cI + z * s;
-        const r02: float = x * z * cI - y * s;
-        const r10: float = x * y * cI - z * s;
-        const r11: float = yy + (1 - yy) * c;
-        const r12: float = y * z * cI + x * s;
-        const r20: float = x * z * cI + y * s;
-        const r21: float = y * z * cI - x * s;
-        const r22: float = zz + (1 - zz) * c;
-
-        const n00: float = this.values[0];
-        const n01: float = this.values[1];
-        const n02: float = this.values[2];
-        const n03: float = this.values[3];
-        const n10: float = this.values[4];
-        const n11: float = this.values[5];
-        const n12: float = this.values[6];
-        const n13: float = this.values[7];
-        const n20: float = this.values[8];
-        const n21: float = this.values[9];
-        const n22: float = this.values[10];
-        const n23: float = this.values[11];
-
-        this.values[0] = r00 * n00 + r01 * n10 + r02 * n20;
-        this.values[1] = r00 * n01 + r01 * n11 + r02 * n21;
-        this.values[2] = r00 * n02 + r01 * n12 + r02 * n22;
-        this.values[3] = r00 * n03 + r01 * n13 + r02 * n23;
-        this.values[4] = r10 * n00 + r11 * n10 + r12 * n20;
-        this.values[5] = r10 * n01 + r11 * n11 + r12 * n21;
-        this.values[6] = r10 * n02 + r11 * n12 + r12 * n22;
-        this.values[7] = r10 * n03 + r11 * n13 + r12 * n23;
-        this.values[8] = r20 * n00 + r21 * n10 + r22 * n20;
-        this.values[9] = r20 * n01 + r21 * n11 + r22 * n21;
-        this.values[10] = r20 * n02 + r21 * n12 + r22 * n22;
-        this.values[11] = r20 * n03 + r21 * n13 + r22 * n23;
-
-        return this;
+        const s: float = Math.sin(radian);
+        // prettier-ignore
+        const rot: Mat3 = new Mat3().set(
+            xx + (1 - xx) * c, normal.x * normal.y * cI + normal.z * s, normal.x * normal.z * cI - normal.y * s,
+            normal.x * normal.y * cI - normal.z * s, yy + (1 - yy) * c, normal.y * normal.z * cI + normal.x * s,
+            normal.x * normal.z * cI + normal.y * s, normal.y * normal.z * cI - normal.x * s, zz + (1 - zz) * c,
+        );
+        const r: Float32Array = rot.values;
+        const v: Float32Array = this.values;
+        // prettier-ignore
+        return this.set(
+            r[0] * v[0] + r[1] * v[4] + r[2] * v[8], r[0] * v[1] + r[1] * v[5] + r[2] * v[9], r[0] * v[2] + r[1] * v[6] + r[2] * v[10], r[0] * v[3] + r[1] * v[7] + r[2] * v[11],
+            r[3] * v[0] + r[4] * v[4] + r[5] * v[8], r[3] * v[1] + r[4] * v[5] + r[5] * v[9], r[3] * v[2] + r[4] * v[6] + r[5] * v[10], r[3] * v[3] + r[4] * v[7] + r[5] * v[11],
+            r[6] * v[0] + r[7] * v[4] + r[8] * v[8], r[6] * v[1] + r[7] * v[5] + r[8] * v[9], r[6] * v[2] + r[7] * v[6] + r[8] * v[10], r[6] * v[3] + r[7] * v[7] + r[8] * v[11],
+            v[12], v[13], v[14], v[15],
+        );
     }
 
-    public scale(x: Vec3 | float, y?: float, z?: float): Mat4 {
+    public scale(
+        x: Vec3 | float,
+        y: Nullable<float> = null,
+        z: Nullable<float> = null,
+    ): Mat4 {
         if (x instanceof Vec3) {
             z = x.z;
             y = x.y;
             x = x.x;
-        } else if (y === undefined || z === undefined) {
+        } else if (y === null || z === null) {
             y = x;
             z = x;
         }
-        if (x === 0 && y === 0 && z === 0) {
-            return this;
-        }
-        this.values[0] *= x as float;
-        this.values[1] *= x as float;
-        this.values[2] *= x as float;
-        this.values[3] *= x as float;
-        this.values[4] *= y as float;
-        this.values[5] *= y as float;
-        this.values[6] *= y as float;
-        this.values[7] *= y as float;
-        this.values[8] *= z as float;
-        this.values[9] *= z as float;
-        this.values[10] *= z as float;
-        this.values[11] *= z as float;
-        return this;
+        const v: Float32Array = this.values;
+        // prettier-ignore
+        return this.set(
+            v[0] * x, v[1] * x, v[2] * x, v[3] * x,
+            v[4] * y, v[5] * y, v[6] * y, v[7] * y,
+            v[8] * z, v[9] * z, v[10] * z, v[11] * z,
+            v[12], v[13], v[14], v[15],
+        );
+    }
+
+    public transpose(): Mat4 {
+        const v: Float32Array = this.values;
+        // prettier-ignore
+        return this.set(
+            v[0],v[4], v[8], v[12],
+            v[1],v[5], v[9], v[13],
+            v[2],v[6], v[10], v[14],
+            v[3],v[7], v[11], v[15],
+        );
     }
 
     public multiply(b: Mat4, a: Mat4 = this): Mat4 {
-        const a00 = a.values[0];
-        const a01 = a.values[1];
-        const a02 = a.values[2];
-        const a03 = a.values[3];
-        const a10 = a.values[4];
-        const a11 = a.values[5];
-        const a12 = a.values[6];
-        const a13 = a.values[7];
-        const a20 = a.values[8];
-        const a21 = a.values[9];
-        const a22 = a.values[10];
-        const a23 = a.values[11];
-        const a30 = a.values[12];
-        const a31 = a.values[13];
-        const a32 = a.values[14];
-        const a33 = a.values[15];
-
-        const b00 = b.values[0];
-        const b01 = b.values[1];
-        const b02 = b.values[2];
-        const b03 = b.values[3];
-        const b10 = b.values[4];
-        const b11 = b.values[5];
-        const b12 = b.values[6];
-        const b13 = b.values[7];
-        const b20 = b.values[8];
-        const b21 = b.values[9];
-        const b22 = b.values[10];
-        const b23 = b.values[11];
-        const b30 = b.values[12];
-        const b31 = b.values[13];
-        const b32 = b.values[14];
-        const b33 = b.values[15];
-
-        this.values[0] = b00 * a00 + b01 * a10 + b02 * a20 + b03 * a30;
-        this.values[1] = b00 * a01 + b01 * a11 + b02 * a21 + b03 * a31;
-        this.values[2] = b00 * a02 + b01 * a12 + b02 * a22 + b03 * a32;
-        this.values[3] = b00 * a03 + b01 * a13 + b02 * a23 + b03 * a33;
-        this.values[4] = b10 * a00 + b11 * a10 + b12 * a20 + b13 * a30;
-        this.values[5] = b10 * a01 + b11 * a11 + b12 * a21 + b13 * a31;
-        this.values[6] = b10 * a02 + b11 * a12 + b12 * a22 + b13 * a32;
-        this.values[7] = b10 * a03 + b11 * a13 + b12 * a23 + b13 * a33;
-        this.values[8] = b20 * a00 + b21 * a10 + b22 * a20 + b23 * a30;
-        this.values[9] = b20 * a01 + b21 * a11 + b22 * a21 + b23 * a31;
-        this.values[10] = b20 * a02 + b21 * a12 + b22 * a22 + b23 * a32;
-        this.values[11] = b20 * a03 + b21 * a13 + b22 * a23 + b23 * a33;
-        this.values[12] = b30 * a00 + b31 * a10 + b32 * a20 + b33 * a30;
-        this.values[13] = b30 * a01 + b31 * a11 + b32 * a21 + b33 * a31;
-        this.values[14] = b30 * a02 + b31 * a12 + b32 * a22 + b33 * a32;
-        this.values[15] = b30 * a03 + b31 * a13 + b32 * a23 + b33 * a33;
-
-        return this;
+        const av: Float32Array = a.values;
+        const bv: Float32Array = b.values;
+        // prettier-ignore
+        return this.set(
+            bv[0] * av[0] + bv[1] * av[4] + bv[2] * av[8] + bv[3] * av[12], bv[0] * av[1] + bv[1] * av[5] + bv[2] * av[9] + bv[3] * av[13], bv[0] * av[2] + bv[1] * av[6] + bv[2] * av[10] + bv[3] * av[14], bv[0] * av[3] + bv[1] * av[7] + bv[2] * av[11] + bv[3] * av[15],
+            bv[4] * av[0] + bv[5] * av[4] + bv[6] * av[8] + bv[7] * av[12], bv[4] * av[1] + bv[5] * av[5] + bv[6] * av[9] + bv[7] * av[13], bv[4] * av[2] + bv[5] * av[6] + bv[6] * av[10] + bv[7] * av[14], bv[4] * av[3] + bv[5] * av[7] + bv[6] * av[11] + bv[7] * av[15],
+            bv[8] * av[0] + bv[9] * av[4] + bv[10] * av[8] + bv[11] * av[12], bv[8] * av[1] + bv[9] * av[5] + bv[10] * av[9] + bv[11] * av[13], bv[8] * av[2] + bv[9] * av[6] + bv[10] * av[10] + bv[11] * av[14], bv[8] * av[3] + bv[9] * av[7] + bv[10] * av[11] + bv[11] * av[15],
+            bv[12] * av[0] + bv[13] * av[4] + bv[14] * av[8] + bv[15] * av[12], bv[12] * av[1] + bv[13] * av[5] + bv[14] * av[9] + bv[15] * av[13], bv[12] * av[2] + bv[13] * av[6] + bv[14] * av[10] + bv[15] * av[14], bv[12] * av[3] + bv[13] * av[7] + bv[14] * av[11] + bv[15] * av[15],
+        );
     }
 
     public invert(): Mat4 {
-        const n11: float = this.values[0];
-        const n21: float = this.values[1];
-        const n31: float = this.values[2];
-        const n41: float = this.values[3];
-        const n12: float = this.values[4];
-        const n22: float = this.values[5];
-        const n32: float = this.values[6];
-        const n42: float = this.values[7];
-        const n13: float = this.values[8];
-        const n23: float = this.values[9];
-        const n33: float = this.values[10];
-        const n43: float = this.values[11];
-        const n14: float = this.values[12];
-        const n24: float = this.values[13];
-        const n34: float = this.values[14];
-        const n44: float = this.values[15];
-
+        const v: Float32Array = this.values;
         // prettier-ignore
-        const t11: float = n23 * n34 * n42 - n24 * n33 * n42 + n24 * n32 * n43 - n22 * n34 * n43 - n23 * n32 * n44 + n22 * n33 * n44;
+        const t01: float = v[9] * v[14] * v[7] - v[13] * v[10] * v[7] + v[13] * v[6] * v[11] - v[5] * v[14] * v[11] - v[9] * v[6] * v[15] + v[5] * v[10] * v[15];
         // prettier-ignore
-        const t12: float = n14 * n33 * n42 - n13 * n34 * n42 - n14 * n32 * n43 + n12 * n34 * n43 + n13 * n32 * n44 - n12 * n33 * n44;
+        const t11: float = v[12] * v[10] * v[7] - v[8] * v[14] * v[7] - v[12] * v[6] * v[11] + v[4] * v[14] * v[11] + v[8] * v[6] * v[15] - v[4] * v[10] * v[15];
         // prettier-ignore
-        const t13: float = n13 * n24 * n42 - n14 * n23 * n42 + n14 * n22 * n43 - n12 * n24 * n43 - n13 * n22 * n44 + n12 * n23 * n44;
+        const t21: float = v[8] * v[13] * v[7] - v[12] * v[9] * v[7] + v[12] * v[5] * v[11] - v[4] * v[13] * v[11] - v[8] * v[5] * v[15] + v[4] * v[9] * v[15];
         // prettier-ignore
-        const t14: float = n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33 + n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34;
-
-        const det = n11 * t11 + n21 * t12 + n31 * t13 + n41 * t14;
-
+        const t31: float = v[12] * v[9] * v[6] - v[8] * v[13] * v[6] - v[12] * v[5] * v[10] + v[4] * v[13] * v[10] + v[8] * v[5] * v[14] - v[4] * v[9] * v[14];
+        const det: float = v[0] * t01 + v[1] * t11 + v[2] * t21 + v[3] * t31;
         if (det === 0) {
             // prettier-ignore
             return this.set(
                 0, 0, 0, 0,
                 0, 0, 0, 0,
                 0, 0, 0, 0,
-                0, 0, 0, 0
+                0, 0, 0, 0,
             );
         }
-
         const detInv: float = 1 / det;
-
-        this.values[0] = t11 * detInv;
         // prettier-ignore
-        this.values[1] = (n24 * n33 * n41 - n23 * n34 * n41 - n24 * n31 * n43 + n21 * n34 * n43 + n23 * n31 * n44 - n21 * n33 * n44) * detInv;
-        // prettier-ignore
-        this.values[2] = (n22 * n34 * n41 - n24 * n32 * n41 + n24 * n31 * n42 - n21 * n34 * n42 - n22 * n31 * n44 + n21 * n32 * n44) * detInv;
-        // prettier-ignore
-        this.values[3] = (n23 * n32 * n41 - n22 * n33 * n41 - n23 * n31 * n42 + n21 * n33 * n42 + n22 * n31 * n43 - n21 * n32 * n43) * detInv;
-        this.values[4] = t12 * detInv;
-        // prettier-ignore
-        this.values[5] = (n13 * n34 * n41 - n14 * n33 * n41 + n14 * n31 * n43 - n11 * n34 * n43 - n13 * n31 * n44 + n11 * n33 * n44) * detInv;
-        // prettier-ignore
-        this.values[6] = (n14 * n32 * n41 - n12 * n34 * n41 - n14 * n31 * n42 + n11 * n34 * n42 + n12 * n31 * n44 - n11 * n32 * n44) * detInv;
-        // prettier-ignore
-        this.values[7] = (n12 * n33 * n41 - n13 * n32 * n41 + n13 * n31 * n42 - n11 * n33 * n42 - n12 * n31 * n43 + n11 * n32 * n43) * detInv;
-        this.values[8] = t13 * detInv;
-        // prettier-ignore
-        this.values[9] = (n14 * n23 * n41 - n13 * n24 * n41 - n14 * n21 * n43 + n11 * n24 * n43 + n13 * n21 * n44 - n11 * n23 * n44) * detInv;
-        // prettier-ignore
-        this.values[10] = (n12 * n24 * n41 - n14 * n22 * n41 + n14 * n21 * n42 - n11 * n24 * n42 - n12 * n21 * n44 + n11 * n22 * n44) * detInv;
-        // prettier-ignore
-        this.values[11] = (n13 * n22 * n41 - n12 * n23 * n41 - n13 * n21 * n42 + n11 * n23 * n42 + n12 * n21 * n43 - n11 * n22 * n43) * detInv;
-        this.values[12] = t14 * detInv;
-        // prettier-ignore
-        this.values[13] = (n13 * n24 * n31 - n14 * n23 * n31 + n14 * n21 * n33 - n11 * n24 * n33 - n13 * n21 * n34 + n11 * n23 * n34) * detInv;
-        // prettier-ignore
-        this.values[14] = (n14 * n22 * n31 - n12 * n24 * n31 - n14 * n21 * n32 + n11 * n24 * n32 + n12 * n21 * n34 - n11 * n22 * n34) * detInv;
-        // prettier-ignore
-        this.values[15] = (n12 * n23 * n31 - n13 * n22 * n31 + n13 * n21 * n32 - n11 * n23 * n32 - n12 * n21 * n33 + n11 * n22 * n33) * detInv;
-
-        return this;
+        return this.set(
+            t01 * detInv, (v[13] * v[10] * v[3] - v[9] * v[14] * v[3] - v[13] * v[2] * v[11] + v[1] * v[14] * v[11] + v[9] * v[2] * v[15] - v[1] * v[10] * v[15]) * detInv, (v[5] * v[14] * v[3] - v[13] * v[6] * v[3] + v[13] * v[2] * v[7] - v[1] * v[14] * v[7] - v[5] * v[2] * v[15] + v[1] * v[6] * v[15]) * detInv, (v[9] * v[6] * v[3] - v[5] * v[10] * v[3] - v[9] * v[2] * v[7] + v[1] * v[10] * v[7] + v[5] * v[2] * v[11] - v[1] * v[6] * v[11]) * detInv,
+            t11 * detInv, (v[8] * v[14] * v[3] - v[12] * v[10] * v[3] + v[12] * v[2] * v[11] - v[0] * v[14] * v[11] - v[8] * v[2] * v[15] + v[0] * v[10] * v[15]) * detInv, (v[12] * v[6] * v[3] - v[4] * v[14] * v[3] - v[12] * v[2] * v[7] + v[0] * v[14] * v[7] + v[4] * v[2] * v[15] - v[0] * v[6] * v[15]) * detInv, (v[4] * v[10] * v[3] - v[8] * v[6] * v[3] + v[8] * v[2] * v[7] - v[0] * v[10] * v[7] - v[4] * v[2] * v[11] + v[0] * v[6] * v[11]) * detInv, 
+            t21 * detInv, (v[12] * v[9] * v[3] - v[8] * v[13] * v[3] - v[12] * v[1] * v[11] + v[0] * v[13] * v[11] + v[8] * v[1] * v[15] - v[0] * v[9] * v[15]) * detInv, (v[4] * v[13] * v[3] - v[12] * v[5] * v[3] + v[12] * v[1] * v[7] - v[0] * v[13] * v[7] - v[4] * v[1] * v[15] + v[0] * v[5] * v[15]) * detInv, (v[8] * v[5] * v[3] - v[4] * v[9] * v[3] - v[8] * v[1] * v[7] + v[0] * v[9] * v[7] + v[4] * v[1] * v[11] - v[0] * v[5] * v[11]) * detInv, 
+            t31 * detInv, (v[8] * v[13] * v[2] - v[12] * v[9] * v[2] + v[12] * v[1] * v[10] - v[0] * v[13] * v[10] - v[8] * v[1] * v[14] + v[0] * v[9] * v[14]) * detInv, (v[12] * v[5] * v[2] - v[4] * v[13] * v[2] - v[12] * v[1] * v[6] + v[0] * v[13] * v[6] + v[4] * v[1] * v[14] - v[0] * v[5] * v[14]) * detInv, (v[4] * v[9] * v[2] - v[8] * v[5] * v[2] + v[8] * v[1] * v[6] - v[0] * v[9] * v[6] - v[4] * v[1] * v[10] + v[0] * v[5] * v[10]) * detInv, 
+        );
     }
 
     public aim(pos: Vec3, dir: Vec3, up: Vec3): Mat4 {
@@ -471,25 +303,15 @@ export class Mat4 {
     }
 
     public clone(): Mat4 {
-        return new Mat4(this.isFloat64).copy(this);
+        return new Mat4().copy(this);
     }
 
-    public static Aim(
-        pos: Vec3,
-        dir: Vec3,
-        up: Vec3,
-        isFloat64?: boolean,
-    ): Mat4 {
-        return new Mat4(isFloat64).aim(pos, dir, up);
+    public static Aim(pos: Vec3, dir: Vec3, up: Vec3): Mat4 {
+        return new Mat4().aim(pos, dir, up);
     }
 
-    public static View(
-        pos: Vec3,
-        dir: Vec3,
-        up: Vec3,
-        isFloat64?: boolean,
-    ): Mat4 {
-        return new Mat4(isFloat64).view(pos, dir, up);
+    public static View(pos: Vec3, dir: Vec3, up: Vec3): Mat4 {
+        return new Mat4().view(pos, dir, up);
     }
 
     public static Perspective(
@@ -497,9 +319,8 @@ export class Mat4 {
         aspect: float,
         near: float,
         far: float,
-        isFloat64?: boolean,
     ): Mat4 {
-        return new Mat4(isFloat64).perspective(fov, aspect, near, far);
+        return new Mat4().perspective(fov, aspect, near, far);
     }
 
     public static Orthogonal(
@@ -509,15 +330,29 @@ export class Mat4 {
         bottom: float,
         near: float,
         far: float,
-        isFloat64?: boolean,
     ): Mat4 {
-        return new Mat4(isFloat64).orthogonal(
-            left,
-            right,
-            top,
-            bottom,
-            near,
-            far,
-        );
+        return new Mat4().orthogonal(left, right, top, bottom, near, far);
+    }
+
+    public static From(mat: Mat2 | Mat3 | Mat4): Mat4 {
+        const v: Float32Array = mat.values;
+        if (mat instanceof Mat2) {
+            // prettier-ignore
+            return new Mat4().set(
+                v[0], v[1], 0, 0,
+                v[2], v[3], 0, 0,
+                0, 0, 0, 0,
+            );
+        }
+        if (mat instanceof Mat3) {
+            // prettier-ignore
+            return new Mat4().set(
+                v[0], v[1], v[2], 0,
+                v[3], v[4], v[5], 0,
+                v[6], v[7], v[8], 0,
+                0, 0, 0, 0,
+            );
+        }
+        return mat.clone();
     }
 }

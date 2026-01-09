@@ -7,6 +7,7 @@ import { float, MapString } from "../types/utilities/utils.type.js";
 import { toRadian, clamp } from "./utilities/utils.js";
 import { Vec3 } from "./utilities/Vec3.js";
 import { Mat4 } from "./utilities/Mat4.js";
+import { Mat3 } from "./utilities/Mat3.js";
 
 type CameraRequirements = {
     position: Vec3;
@@ -149,12 +150,12 @@ export class Controller {
 
     private updateDirection(x: float, y: float): void {
         this.transform.reset();
-        this.transform.rotateY(-x * 0.1 * toRadian);
-        this.camera.direction.applyMat(this.transform);
+        this.transform.rotateY(x * 0.1 * toRadian);
+        this.camera.direction.multiply(Mat3.From(this.transform));
         this.left.copy(this.camera.direction).cross(this.globalUp);
         this.transform.reset();
-        this.transform.rotateAxis(this.left.normalize(), y * 0.1 * toRadian);
-        this.camera.direction.applyMat(this.transform).normalize();
+        this.transform.rotateAxis(this.left.normalize(), -y * 0.1 * toRadian);
+        this.camera.direction.multiply(Mat3.From(this.transform)).normalize();
     }
 
     private reset(): void {
