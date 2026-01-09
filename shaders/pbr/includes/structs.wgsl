@@ -4,6 +4,7 @@
  */
 
 struct Camera {
+    position: vec3f,
     viewProjection: mat4x4f,
 }
 

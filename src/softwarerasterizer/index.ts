@@ -63,6 +63,12 @@ const viewProjection: Mat4 = new Mat4();
 const cameraPos: Vec3 = new Vec3(0, 1, 2);
 const cameraDir: Vec3 = new Vec3(0, 0.5, 1).normalize();
 const up: Vec3 = new Vec3(0, 1, 0);
+const cameraData: Float32Array = new Float32Array(4 + 4 * 4);
+const cameraBuffer: GPUBuffer = device.createBuffer({
+    size: cameraData.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 const control: Controller = new Controller(canvas, {
     position: cameraPos,
     direction: cameraDir,
@@ -88,15 +94,6 @@ for (const name of deltaNames) {
     stats.set(name + " delta", 0);
 }
 stats.show();
-
-//////////// UNIFORM ////////////
-
-const cameraData: Float32Array = new Float32Array(4 + 4 * 4);
-const cameraBuffer: GPUBuffer = device.createBuffer({
-    size: cameraData.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-});
-device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 
 //////////// GEOMETRY ////////////
 

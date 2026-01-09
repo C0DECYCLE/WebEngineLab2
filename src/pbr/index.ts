@@ -3,6 +3,7 @@
  * Written by Noah Mattia Bussinger
  */
 
+import { WebGPUSinglePassDownsampler } from "../../node_modules/webgpu-spd/dist/index.js";
 import { Controller } from "../Controller.js";
 import { RollingAverage } from "../RollingAverage.js";
 import { Stats } from "../Stats.js";
@@ -10,11 +11,13 @@ import { Mat4 } from "../utilities/Mat4.js";
 import { assert, toRadian } from "../utilities/utils.js";
 import { float, int, Nullable, Undefinable } from "../utilities/utils.type.js";
 import { Vec3 } from "../utilities/Vec3.js";
-import { includeExternal, loadOBJ, OBJ } from "./helper.js";
+import { includeExternal, loadOBJ, loadTexture, OBJ } from "./helper.js";
 
 //////////// CONSTS ////////////
 
 const byteSize: int = 4;
+const directory: string = "./resources/lantern/";
+export const imageFormat: GPUTextureFormat = "rgba8unorm";
 const depthFormat: GPUTextureFormat = "depth32float";
 
 //////////// SETUP ////////////
@@ -56,6 +59,12 @@ const viewProjection: Mat4 = new Mat4();
 const cameraPos: Vec3 = new Vec3(0, 1, 2);
 const cameraDir: Vec3 = new Vec3(0, 0.5, 1).normalize();
 const up: Vec3 = new Vec3(0, 1, 0);
+const cameraData: Float32Array = new Float32Array(4 + 4 * 4);
+const cameraBuffer: GPUBuffer = device.createBuffer({
+    size: cameraData.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 const control: Controller = new Controller(canvas, {
     position: cameraPos,
     direction: cameraDir,
@@ -76,18 +85,9 @@ for (const name of deltaNames) {
 }
 stats.show();
 
-//////////// UNIFORM ////////////
-
-const cameraData: Float32Array = new Float32Array(4 * 4);
-const cameraBuffer: GPUBuffer = device.createBuffer({
-    size: cameraData.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-});
-device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
-
 //////////// GEOMETRY ////////////
 
-const geometry: OBJ = await loadOBJ("./resources/lanternPBR.obj");
+const geometry: OBJ = await loadOBJ(directory + "lantern_full.obj");
 const vertexBuffer: GPUBuffer = device.createBuffer({
     size: geometry.vertices.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -99,6 +99,49 @@ const indexBuffer: GPUBuffer = device.createBuffer({
         GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
 });
 device.queue.writeBuffer(indexBuffer, 0, geometry.indices.buffer);
+
+//////////// TEXTURE ////////////
+
+const downsampler: WebGPUSinglePassDownsampler =
+    new WebGPUSinglePassDownsampler({
+        device: device,
+        formats: [{ format: imageFormat }],
+    });
+const textureSampler: GPUSampler = device.createSampler({
+    minFilter: "linear",
+    magFilter: "linear",
+    mipmapFilter: "nearest",
+});
+const baseColorTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_baseColor.jpg",
+);
+const normalTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_normal.jpg",
+);
+const specularTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_specular.jpg",
+);
+const glossTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_gloss.jpg",
+);
+const ambientOcclusionTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_ambientOcclusion.jpg",
+);
+const cavityTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_cavity.jpg",
+);
 
 //////////// GPU TIMING ////////////
 
@@ -165,6 +208,13 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
     entries: [
         { binding: 0, resource: cameraBuffer },
         { binding: 1, resource: vertexBuffer },
+        { binding: 2, resource: textureSampler },
+        { binding: 3, resource: baseColorTexture },
+        { binding: 4, resource: normalTexture },
+        { binding: 5, resource: specularTexture },
+        { binding: 6, resource: glossTexture },
+        { binding: 7, resource: ambientOcclusionTexture },
+        { binding: 8, resource: cavityTexture },
     ],
 });
 
@@ -176,8 +226,9 @@ function frame(now: float): void {
     //////////// UPDATE ////////////
 
     control.update();
+    cameraPos.store(cameraData, 0);
     cameraView.view(cameraPos, cameraDir, up);
-    viewProjection.multiply(cameraView, projection).store(cameraData);
+    viewProjection.multiply(cameraView, projection).store(cameraData, 4);
     device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 
     //////////// ENCODE ////////////

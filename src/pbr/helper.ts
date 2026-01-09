@@ -3,10 +3,16 @@
  * Written by Noah Mattia Bussinger
  */
 
+import {
+    maxMipLevelCount,
+    SPDFilters,
+    WebGPUSinglePassDownsampler,
+} from "../../node_modules/webgpu-spd/dist/index.js";
 import { assert } from "../utilities/utils.js";
 import { float, int, Nullable } from "../utilities/utils.type.js";
 import { Vec2 } from "../utilities/Vec2.js";
 import { Vec3 } from "../utilities/Vec3.js";
+import { imageFormat } from "./index.js";
 
 //////////// SHADER ////////////
 
@@ -56,7 +62,7 @@ export async function loadOBJ(file: string): Promise<OBJ> {
             const x: float = parseFloat(parts[1]);
             const y: float = parseFloat(parts[2]);
             const z: float = parseFloat(parts[3]);
-            normals.push(new Vec3(x, y, z));
+            normals.push(new Vec3(x, y, z).normalize());
         }
         if (parts[0] === "vt") {
             const u: float = parseFloat(parts[1]);
@@ -87,4 +93,34 @@ export async function loadOBJ(file: string): Promise<OBJ> {
         indices: new Uint32Array(indices),
     };
     return obj;
+}
+
+//////////// TEXTURE ////////////
+
+export async function loadTexture(
+    device: GPUDevice,
+    downsampler: WebGPUSinglePassDownsampler,
+    file: string,
+): Promise<GPUTexture> {
+    const blob: Blob = await (await fetch(file)).blob();
+    const imageBitmap: ImageBitmap = await createImageBitmap(blob);
+    const texture: GPUTexture = device.createTexture({
+        format: imageFormat,
+        size: [imageBitmap.width, imageBitmap.height],
+        mipLevelCount: maxMipLevelCount(imageBitmap.width, imageBitmap.height),
+        usage:
+            GPUTextureUsage.TEXTURE_BINDING |
+            GPUTextureUsage.STORAGE_BINDING |
+            GPUTextureUsage.COPY_DST |
+            GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture(
+        { source: imageBitmap, flipY: true },
+        { texture: texture, mipLevel: 0 },
+        [imageBitmap.width, imageBitmap.height],
+    );
+    downsampler.generateMipmaps(device, texture, {
+        filter: SPDFilters.Average,
+    });
+    return texture;
 }
