@@ -6,14 +6,20 @@
         "passphrase": "test"
     },
     "cSpell.words": [
+        "adjncy",
+        "adjwgt",
         "BINDGROUP",
+        "dists",
         "ensurance",
         "floatingorigin",
         "fragmentspace",
         "instancebatching",
+        "nparts",
         "persistentthreads",
         "Readback",
         "softwarerasterizer",
-        "voxelize"
+        "topo",
+        "voxelize",
+        "xadj"
     ]
 }

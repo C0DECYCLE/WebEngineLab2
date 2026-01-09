@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 // DO NOT ADD IMPORTS TO '*.d.ts' files!
 // https://stackoverflow.com/a/51114250
 

@@ -28,6 +28,7 @@ struct VertexShaderOut {
     @builtin(position) position: vec4f,
     @interpolate(flat) @location(0) index: u32,
     @interpolate(flat) @location(1) index2: u32,
+    @location(2) worldspace: vec3f,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -50,6 +51,7 @@ struct VertexShaderOut {
     out.position = uniforms.viewProjection * vec4f(position, 1);
     out.index = task.instanceIndex * 1 + u32(vertex.group) * 1 + task.meshletIndex * 0;
     out.index2 = task.instanceIndex * 1 + u32(vertex.group) * 1 + task.meshletIndex * 1;
+    out.worldspace = position;
     return out;
 }
 
@@ -57,9 +59,17 @@ struct VertexShaderOut {
     @builtin(primitive_index) primitiveIndex: u32, 
     @interpolate(flat) @location(0) index: u32,
     @interpolate(flat) @location(1) index2: u32,
+    @location(2) worldspace: vec3f,
 ) -> @location(0) vec4f {
-    //return vec4f(random(f32(index2 + primitiveIndex * 0)), 1);
-    return vec4f(random(f32(index2 + primitiveIndex * 0)) * 0.9 + random(f32(index2 + primitiveIndex * 1)) * 0.1, 1);
+    let normal: vec3f = normalize(cross(dpdx(worldspace), dpdy(worldspace)));
+    var shade: f32 = dot(normal, -normalize(vec3f(1, 1, 1))) * 0.5 + 0.5;
+    //shade = shade * shade;
+    shade = 1;
+    //shade = shade * 0.5 + 0.5;
+    //return vec4f(shade, shade, shade, 1);
+    return vec4f(random(f32(index2 + primitiveIndex * 0)) * shade, 1);
+    //return vec4f(random(f32(index + primitiveIndex * 0)), 1);
+    //return vec4f(random(f32(index2 + primitiveIndex * 0)) * 0.9 + random(f32(index2 + primitiveIndex * 1)) * 0.1, 1);
     //return vec4f(random(f32(index + primitiveIndex * 0)) * 0.9 + random(f32(index2 + primitiveIndex * 0)) * 0.1, 1);
 }
 

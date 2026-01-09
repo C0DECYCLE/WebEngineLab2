@@ -186,7 +186,7 @@ device!.queue.writeBuffer(uniformBuffer, 0, uniformArrayBuffer);
 
 //////////// VERTICES ////////////
 
-const data: OBJParseResult = await loadOBJ("./resources/bakery.obj");
+const data: OBJParseResult = await loadOBJ("./resources/bunny.obj");
 // /*
 const now: float = performance.now();
 const {

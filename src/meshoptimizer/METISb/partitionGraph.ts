@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import * as MetisModule from "./metis3-1.js";
 import { metisCall, wasmPtr } from "./wasm.js";
 
