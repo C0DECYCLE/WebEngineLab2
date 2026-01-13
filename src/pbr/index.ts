@@ -7,8 +7,9 @@ import { WebGPUSinglePassDownsampler } from "../../node_modules/webgpu-spd/dist/
 import { Controller } from "../Controller.js";
 import { RollingAverage } from "../RollingAverage.js";
 import { Stats } from "../Stats.js";
+import { log } from "../utilities/logger.js";
 import { Mat4 } from "../utilities/Mat4.js";
-import { assert, toRadian } from "../utilities/utils.js";
+import { assert, dotit, toRadian } from "../utilities/utils.js";
 import { float, int, Nullable, Undefinable } from "../utilities/utils.type.js";
 import { Vec3 } from "../utilities/Vec3.js";
 import { includeExternal, loadOBJ, loadTexture, OBJ } from "./helper.js";
@@ -19,6 +20,7 @@ const byteSize: int = 4;
 const directory: string = "./resources/lantern/";
 export const imageFormat: GPUTextureFormat = "rgba8unorm";
 const depthFormat: GPUTextureFormat = "depth32float";
+(window as any).PBR = true;
 
 //////////// SETUP ////////////
 
@@ -87,6 +89,7 @@ stats.show();
 
 //////////// GEOMETRY ////////////
 
+const gPre: float = performance.now();
 const geometry: OBJ = await loadOBJ(directory + "lantern_full.obj");
 const vertexBuffer: GPUBuffer = device.createBuffer({
     size: geometry.vertices.byteLength,
@@ -99,14 +102,13 @@ const indexBuffer: GPUBuffer = device.createBuffer({
         GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
 });
 device.queue.writeBuffer(indexBuffer, 0, geometry.indices.buffer);
+log("geometry", dotit(performance.now() - gPre), "ms");
 
 //////////// TEXTURE ////////////
 
+const tPre: float = performance.now();
 const downsampler: WebGPUSinglePassDownsampler =
-    new WebGPUSinglePassDownsampler({
-        device: device,
-        formats: [{ format: imageFormat }],
-    });
+    new WebGPUSinglePassDownsampler({ device: device });
 const textureSampler: GPUSampler = device.createSampler({
     minFilter: "linear",
     magFilter: "linear",
@@ -142,6 +144,17 @@ const cavityTexture: GPUTexture = await loadTexture(
     downsampler,
     directory + "lantern_cavity.jpg",
 );
+const roughnessTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_roughness.jpg",
+);
+const fuzzTexture: GPUTexture = await loadTexture(
+    device,
+    downsampler,
+    directory + "lantern_fuzz.jpg",
+);
+log("textures", dotit(performance.now() - tPre), "ms");
 
 //////////// GPU TIMING ////////////
 
@@ -165,20 +178,43 @@ const queryReadbackBuffer: GPUBuffer = device.createBuffer({
 
 //////////// SHADER ////////////
 
-const renderShader: GPUShaderModule = device.createShaderModule({
-    code: await includeExternal("render.wgsl"),
+const nonPBRShader: GPUShaderModule = device.createShaderModule({
+    code: await includeExternal("nonPBR.wgsl"),
+});
+const PBRShader: GPUShaderModule = device.createShaderModule({
+    code: await includeExternal("PBR.wgsl"),
 });
 
 //////////// PIPELINE ////////////
 
-const renderPipeline: GPURenderPipeline = device.createRenderPipeline({
+const nonPBRPipeline: GPURenderPipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
-        module: renderShader,
+        module: nonPBRShader,
         entryPoint: "vs",
     },
     fragment: {
-        module: renderShader,
+        module: nonPBRShader,
+        entryPoint: "fs",
+        targets: [{ format: presentationFormat }],
+    },
+    primitive: {
+        cullMode: "back",
+    },
+    depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: "less",
+        format: depthFormat,
+    } as GPUDepthStencilState,
+});
+const PBRPipeline: GPURenderPipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+        module: PBRShader,
+        entryPoint: "vs",
+    },
+    fragment: {
+        module: PBRShader,
         entryPoint: "fs",
         targets: [{ format: presentationFormat }],
     },
@@ -203,8 +239,8 @@ const depthTextureView: GPUTextureView = depthTexture.createView();
 
 //////////// BINDGROUP ////////////
 
-const renderBindGroup: GPUBindGroup = device.createBindGroup({
-    layout: renderPipeline.getBindGroupLayout(0),
+const nonPBRBindGroup: GPUBindGroup = device.createBindGroup({
+    layout: nonPBRPipeline.getBindGroupLayout(0),
     entries: [
         { binding: 0, resource: cameraBuffer },
         { binding: 1, resource: vertexBuffer },
@@ -215,6 +251,20 @@ const renderBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 6, resource: glossTexture },
         { binding: 7, resource: ambientOcclusionTexture },
         { binding: 8, resource: cavityTexture },
+    ],
+});
+const PBRBindGroup: GPUBindGroup = device.createBindGroup({
+    layout: PBRPipeline.getBindGroupLayout(0),
+    entries: [
+        { binding: 0, resource: cameraBuffer },
+        { binding: 1, resource: vertexBuffer },
+        { binding: 2, resource: textureSampler },
+        { binding: 3, resource: baseColorTexture },
+        { binding: 4, resource: normalTexture },
+        { binding: 5, resource: roughnessTexture },
+        { binding: 6, resource: ambientOcclusionTexture },
+        { binding: 7, resource: cavityTexture },
+        { binding: 8, resource: fuzzTexture },
     ],
 });
 
@@ -237,6 +287,12 @@ function frame(now: float): void {
 
     const encoder: GPUCommandEncoder = device.createCommandEncoder();
 
+    const renderPipeline: GPURenderPipeline = (window as any).PBR
+        ? PBRPipeline
+        : nonPBRPipeline;
+    const renderBindGroup: GPUBindGroup = (window as any).PBR
+        ? PBRBindGroup
+        : nonPBRBindGroup;
     const renderPass: GPURenderPassEncoder = encoder.beginRenderPass({
         colorAttachments: [
             {

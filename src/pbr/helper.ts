@@ -5,7 +5,6 @@
 
 import {
     maxMipLevelCount,
-    SPDFilters,
     WebGPUSinglePassDownsampler,
 } from "../../node_modules/webgpu-spd/dist/index.js";
 import { assert } from "../utilities/utils.js";
@@ -103,7 +102,9 @@ export async function loadTexture(
     file: string,
 ): Promise<GPUTexture> {
     const blob: Blob = await (await fetch(file)).blob();
-    const imageBitmap: ImageBitmap = await createImageBitmap(blob);
+    const imageBitmap: ImageBitmap = await createImageBitmap(blob, {
+        colorSpaceConversion: "none",
+    });
     const texture: GPUTexture = device.createTexture({
         format: imageFormat,
         size: [imageBitmap.width, imageBitmap.height],
@@ -119,8 +120,6 @@ export async function loadTexture(
         { texture: texture, mipLevel: 0 },
         [imageBitmap.width, imageBitmap.height],
     );
-    downsampler.generateMipmaps(device, texture, {
-        filter: SPDFilters.Average,
-    });
+    downsampler.generateMipmaps(device, texture);
     return texture;
 }
