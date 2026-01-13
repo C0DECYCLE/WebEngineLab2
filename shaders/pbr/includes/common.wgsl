@@ -10,7 +10,7 @@ fn unpack(pack: VertexPack) -> Vertex {
   return Vertex(position, normal, uv);
 }
 
-fn deriveTbn(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
+fn deriveTBN(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
     let dposition1: vec3f = dpdx(position);
     let dposition2: vec3f = dpdy(position);
     let duv1: vec2f = dpdx(uv);
@@ -22,27 +22,6 @@ fn deriveTbn(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
     let invmax: f32 = inverseSqrt(max(dot(tangent, tangent), dot(bitangent, bitangent)));
     return mat3x3f(tangent * invmax, bitangent * invmax, normal);
 }
-
-fn computeTBN(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
-    let dp1: vec3f = dpdx(position);
-    let dp2: vec3f = dpdy(position);
-    let duv1: vec3f = dpdx(uv);
-    let duv2: vec3f = dpdy(uv);
-    let tangent: vec3f = normalize(dp1 * duv2.y - dp2 * duv1.y);
-    let bitangent: vec3f = normalize(-dp1 * duv2.x + dp2 * duv1.x);
-    return mat3x3f(tangent, bitangent, normal);
-}
-
-
-/*
-fn srgbToLinear(srgb: vec3f) -> vec3f {
-  return pow(srgb, vec3f(2.2));
-}
-
-fn linearToSrgb(linear: vec3f) -> vec3f {
-  return pow(linear, vec3f(1 / 2.2));
-}
-*/
 
 fn tonemapReinhard(color: vec3f) -> vec3f {
     return color / (color + vec3f(1));

@@ -8,7 +8,7 @@ import {
     SPDFilters,
     WebGPUSinglePassDownsampler,
 } from "../../node_modules/webgpu-spd/dist/index.js";
-import { assert } from "../utilities/utils.js";
+import { assert, fileExists } from "../utilities/utils.js";
 import { float, int, Nullable } from "../utilities/utils.type.js";
 import { Vec2 } from "../utilities/Vec2.js";
 import { Vec3 } from "../utilities/Vec3.js";
@@ -96,6 +96,8 @@ export async function loadOBJ(file: string): Promise<OBJ> {
 
 //////////// TEXTURE ////////////
 
+let dummyTextureView: Nullable<GPUTextureView> = null;
+
 export async function loadTexture(
     device: GPUDevice,
     downsampler: WebGPUSinglePassDownsampler,
@@ -103,6 +105,17 @@ export async function loadTexture(
     format: GPUTextureFormat,
     viewFormat: GPUTextureFormat,
 ): Promise<GPUTextureView> {
+    if (!(await fileExists(file))) {
+        if (!dummyTextureView) {
+            const dummyTexture: GPUTexture = device.createTexture({
+                format: "r8unorm",
+                size: [1, 1],
+                usage: GPUTextureUsage.TEXTURE_BINDING,
+            });
+            dummyTextureView = dummyTexture.createView();
+        }
+        return dummyTextureView;
+    }
     const blob: Blob = await (await fetch(file)).blob();
     const imageBitmap: ImageBitmap = await createImageBitmap(blob, {
         colorSpaceConversion: "none",

@@ -88,3 +88,11 @@ export async function loadText(path: string): Promise<string> {
 export function sum<T extends int | float>(value: T[]): T {
     return value.reduce((result: T, v: T) => (result + v) as T, 0 as T);
 }
+
+export async function fileExists(path: string): Promise<boolean> {
+    try {
+        return (await fetch(path, { method: "HEAD" })).ok;
+    } catch (error) {
+        return false;
+    }
+}

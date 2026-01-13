@@ -32,28 +32,27 @@
 @fragment fn fs(
     rasterize: Rasterize
 ) -> @location(0) vec4f {
-    let baseColorSample: vec3f = textureSample(baseColorTexture, textureSampler, rasterize.uv).rgb;
-    let normalSample: vec3f = textureSample(normalTexture, textureSampler, rasterize.uv).rgb;
-    let specularSample: f32 = textureSample(specularTexture, textureSampler, rasterize.uv).r;
-    let roughnessSample: f32 = textureSample(roughnessTexture, textureSampler, rasterize.uv).r;
-    let ambientOcclusionSample: f32 = textureSample(ambientOcclusionTexture, textureSampler, rasterize.uv).r;
-    let cavitySample: f32 = textureSample(cavityTexture, textureSampler, rasterize.uv).r;
+    let albedo: vec3f = textureSample(baseColorTexture, textureSampler, rasterize.uv).rgb;
+    let normalMap: vec3f = textureSample(normalTexture, textureSampler, rasterize.uv).rgb;
+    let specularStrength: f32 = textureSample(specularTexture, textureSampler, rasterize.uv).r;
+    let roughness: f32 = textureSample(roughnessTexture, textureSampler, rasterize.uv).r;
+    let ao: f32 = textureSample(ambientOcclusionTexture, textureSampler, rasterize.uv).r;
+    let cavity: f32 = textureSample(cavityTexture, textureSampler, rasterize.uv).r;
 
-    let tbn: mat3x3f = deriveTbn(rasterize.position, rasterize.normal, rasterize.uv);
-    let normal: vec3f = normalize(tbn * (normalSample * 2 - 1));
-    let light: vec3f = normalize(-vec3f(-1, -1, -1));
-    let view: vec3f = normalize(camera.position - rasterize.position);
-    let halfway: vec3f = normalize(light + view);
+    let lightDir: vec3f = normalize(-vec3f(-1, -1, -1));
+    let lightColor: vec3f = vec3f(1/*, 0.8, 0.6*/);
+    let tbn: mat3x3f = deriveTBN(rasterize.position, normalize(rasterize.normal), rasterize.uv);
+    let normal: vec3f = normalize(tbn * normalize(normalMap * 2 - 1));
+    let viewDir: vec3f = normalize(camera.position - rasterize.position);
+    let halfDir: vec3f = normalize(lightDir + viewDir);
 
-    let ambientStrength: f32 = 0.5 * ambientOcclusionSample * cavitySample;
-    let ambient: vec3f = ambientStrength * baseColorSample;
+    let halfLambert: f32 = dot(normal, lightDir) * 0.5 + 0.5;
+    let diffuse: vec3f = albedo * halfLambert;
 
-    let diffuseStrength: f32 = max(dot(normal, light), 0) * cavitySample;
-    let diffuse: vec3f = diffuseStrength * baseColorSample;
+    let gloss: f32 = 1 - roughness;
+    let shininess: f32 = mix(8, 256, gloss);
+    let reflectivity: f32 = max(dot(normal, halfDir), 0);
+    let specular: f32 = pow(reflectivity, shininess) * specularStrength;
 
-    let specularStrength: f32 = pow(max(dot(normal, halfway), 0), pow(2, glossSample * 7));
-    let specular: vec3f = specularStrength * vec3f(specularSample);
-
-    return vec4f(ambient + diffuse, 1);
-    return vec4f(ambient + diffuse + specular, 1);
+    return vec4f((diffuse + specular) * lightColor * ao * cavity, 1);
 }

@@ -17,6 +17,15 @@ import { includeExternal, loadOBJ, loadTexture, OBJ } from "./helper.js";
 //////////// CONSTS ////////////
 
 const byteSize: int = 4;
+/*
+- lantern
+- suitcase
+- desertcliff
+- nordicrock
+- statue
+- bust
+- snow
+*/
 const mesh: string = "lantern";
 const directory: string = "./resources/" + mesh + "/";
 const depthFormat: GPUTextureFormat = "depth32float";
@@ -108,6 +117,8 @@ const indexBuffer: GPUBuffer = device.createBuffer({
 });
 device.queue.writeBuffer(indexBuffer, 0, geometry.indices.buffer);
 log("geometry", dotit(performance.now() - gPre), "ms");
+log("vertices", dotit(geometry.vertices.length / 8));
+log("triangles", dotit(geometry.indices.length / 3));
 
 //////////// TEXTURE ////////////
 
@@ -131,7 +142,7 @@ const downsampler: WebGPUSinglePassDownsampler =
 const textureSampler: GPUSampler = device.createSampler({
     minFilter: "linear",
     magFilter: "linear",
-    mipmapFilter: "nearest", // "linear"
+    mipmapFilter: "linear", // "nearest" for performance
 });
 const baseColorTexture: GPUTextureView = await loadTexture(
     device,
@@ -152,7 +163,7 @@ const specularTexture: GPUTextureView = await loadTexture(
     downsampler,
     directory + mesh + "_specular.jpg",
     linearFormat,
-    linearFormat, //srgbFormat,
+    srgbFormat, //srgbFormat,
 );
 const roughnessTexture: GPUTextureView = await loadTexture(
     device,
@@ -161,7 +172,6 @@ const roughnessTexture: GPUTextureView = await loadTexture(
     linearFormat,
     linearFormat,
 );
-/*
 const metalnessTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
@@ -169,7 +179,6 @@ const metalnessTexture: GPUTextureView = await loadTexture(
     linearFormat,
     linearFormat,
 );
-*/
 const ambientOcclusionTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
@@ -182,7 +191,7 @@ const cavityTexture: GPUTextureView = await loadTexture(
     downsampler,
     directory + mesh + "_cavity.jpg",
     linearFormat,
-    linearFormat, //srgbFormat,
+    srgbFormat, //srgbFormat,
 );
 const fuzzTexture: GPUTextureView = await loadTexture(
     device,
@@ -301,9 +310,10 @@ const PBRBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 3, resource: baseColorTexture },
         { binding: 4, resource: normalTexture },
         { binding: 5, resource: roughnessTexture },
-        { binding: 6, resource: ambientOcclusionTexture },
-        { binding: 7, resource: cavityTexture },
-        { binding: 8, resource: fuzzTexture },
+        { binding: 6, resource: metalnessTexture },
+        { binding: 7, resource: ambientOcclusionTexture },
+        { binding: 8, resource: cavityTexture },
+        { binding: 9, resource: fuzzTexture },
     ],
 });
 

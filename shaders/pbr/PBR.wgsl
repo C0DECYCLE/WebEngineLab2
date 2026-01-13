@@ -13,9 +13,10 @@
 @group(0) @binding(3) var albedoTexture: texture_2d<f32>;
 @group(0) @binding(4) var normalTexture: texture_2d<f32>;
 @group(0) @binding(5) var roughnessTexture: texture_2d<f32>;
-@group(0) @binding(6) var ambientOcclusionTexture: texture_2d<f32>;
-@group(0) @binding(7) var cavityTexture: texture_2d<f32>;
-@group(0) @binding(8) var fuzzTexture: texture_2d<f32>;
+@group(0) @binding(6) var metalnessTexture: texture_2d<f32>;
+@group(0) @binding(7) var ambientOcclusionTexture: texture_2d<f32>;
+@group(0) @binding(8) var cavityTexture: texture_2d<f32>;
+@group(0) @binding(9) var fuzzTexture: texture_2d<f32>;
 
 @vertex fn vs(
     @builtin(vertex_index) vertexIndex: u32
@@ -35,10 +36,11 @@
     let albedoSample: vec3f = textureSample(albedoTexture, textureSampler, rasterize.uv).rgb;
     let normalSample: vec3f = textureSample(normalTexture, textureSampler, rasterize.uv).rgb;
     let roughnessSample: f32 = textureSample(roughnessTexture, textureSampler, rasterize.uv).r;
+    let metalnessSample: f32 = textureSample(metalnessTexture, textureSampler, rasterize.uv).r;
     let ambientOcclusionSample: f32 = textureSample(ambientOcclusionTexture, textureSampler, rasterize.uv).r;
     let cavitySample: f32 = textureSample(cavityTexture, textureSampler, rasterize.uv).r;
     let fuzzSample: f32 = textureSample(fuzzTexture, textureSampler, rasterize.uv).r;
-
+    
     return vec4(albedoSample, 1);
     //return vec4(rasterize.normal * 0.5 + 0.5, 1);
 }
