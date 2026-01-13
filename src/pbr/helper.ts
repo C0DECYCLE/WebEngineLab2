@@ -5,13 +5,13 @@
 
 import {
     maxMipLevelCount,
+    SPDFilters,
     WebGPUSinglePassDownsampler,
 } from "../../node_modules/webgpu-spd/dist/index.js";
 import { assert } from "../utilities/utils.js";
 import { float, int, Nullable } from "../utilities/utils.type.js";
 import { Vec2 } from "../utilities/Vec2.js";
 import { Vec3 } from "../utilities/Vec3.js";
-import { imageFormat } from "./index.js";
 
 //////////// SHADER ////////////
 
@@ -100,26 +100,34 @@ export async function loadTexture(
     device: GPUDevice,
     downsampler: WebGPUSinglePassDownsampler,
     file: string,
-): Promise<GPUTexture> {
+    format: GPUTextureFormat,
+    viewFormat: GPUTextureFormat,
+): Promise<GPUTextureView> {
     const blob: Blob = await (await fetch(file)).blob();
     const imageBitmap: ImageBitmap = await createImageBitmap(blob, {
         colorSpaceConversion: "none",
     });
     const texture: GPUTexture = device.createTexture({
-        format: imageFormat,
+        format: format,
+        viewFormats: [format, viewFormat],
         size: [imageBitmap.width, imageBitmap.height],
         mipLevelCount: maxMipLevelCount(imageBitmap.width, imageBitmap.height),
         usage:
             GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
             GPUTextureUsage.COPY_DST |
-            GPUTextureUsage.RENDER_ATTACHMENT,
+            GPUTextureUsage.RENDER_ATTACHMENT |
+            GPUTextureUsage.STORAGE_BINDING,
     });
     device.queue.copyExternalImageToTexture(
         { source: imageBitmap, flipY: true },
         { texture: texture, mipLevel: 0 },
         [imageBitmap.width, imageBitmap.height],
     );
-    downsampler.generateMipmaps(device, texture);
-    return texture;
+    downsampler.generateMipmaps(device, texture, {
+        filter: SPDFilters.Average,
+    });
+    return texture.createView({
+        format: viewFormat,
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
 }

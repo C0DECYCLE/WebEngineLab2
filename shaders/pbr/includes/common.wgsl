@@ -10,7 +10,7 @@ fn unpack(pack: VertexPack) -> Vertex {
   return Vertex(position, normal, uv);
 }
 
-fn derive(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
+fn deriveTbn(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
     let dposition1: vec3f = dpdx(position);
     let dposition2: vec3f = dpdy(position);
     let duv1: vec2f = dpdx(uv);
@@ -23,25 +23,26 @@ fn derive(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
     return mat3x3f(tangent * invmax, bitangent * invmax, normal);
 }
 
-
-
-fn srgbToLinearF32(srgb: f32) -> f32 {
-  return pow(srgb, 2.2);
+fn computeTBN(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
+    let dp1: vec3f = dpdx(position);
+    let dp2: vec3f = dpdy(position);
+    let duv1: vec3f = dpdx(uv);
+    let duv2: vec3f = dpdy(uv);
+    let tangent: vec3f = normalize(dp1 * duv2.y - dp2 * duv1.y);
+    let bitangent: vec3f = normalize(-dp1 * duv2.x + dp2 * duv1.x);
+    return mat3x3f(tangent, bitangent, normal);
 }
 
-fn linearToSrgbF32(linear: f32) -> f32 {
-  return pow(linear,  1 / 2.2);
-}
 
-fn srgbToLinearVec3f(srgb: vec3f) -> vec3f {
+/*
+fn srgbToLinear(srgb: vec3f) -> vec3f {
   return pow(srgb, vec3f(2.2));
 }
 
-fn linearToSrgbVec3f(linear: vec3f) -> vec3f {
+fn linearToSrgb(linear: vec3f) -> vec3f {
   return pow(linear, vec3f(1 / 2.2));
 }
-
-
+*/
 
 fn tonemapReinhard(color: vec3f) -> vec3f {
     return color / (color + vec3f(1));
@@ -89,38 +90,4 @@ fn tonemapPBRNeutral(color: vec3f) -> vec3f {
     let compressed: vec3f = color * scale;
     let g: f32 = dot(compressed, vec3(0.299, 0.587, 0.114));
     return mix(compressed, vec3(g), desaturation);
-}
-
-
-
-fn fresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-fn distributionGGX(N: vec3<f32>, H: vec3<f32>, roughness: f32) -> f32 {
-    let a = roughness * roughness;
-    let a2 = a * a;
-    let NdotH = max(dot(N, H), 0.0);
-    let denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
-    return a2 / (3.14159265 * denom * denom);
-}
-
-fn geometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
-    let r = roughness + 1.0;
-    let k = (r * r) / 8.0;
-    return NdotV / (NdotV * (1.0 - k) + k);
-}
-
-fn geometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f32 {
-    let NdotV = max(dot(N, V), 0.0);
-    let NdotL = max(dot(N, L), 0.0);
-    let ggxV = geometrySchlickGGX(NdotV, roughness);
-    let ggxL = geometrySchlickGGX(NdotL, roughness);
-    return ggxV * ggxL;
-}
-
-fn SheenBRDF(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, sheenColor: vec3<f32>) -> vec3<f32> {
-    let NdotL = max(dot(N, L), 0.0);
-    let NdotV = max(dot(N, V), 0.0);
-    return sheenColor * (NdotL / (NdotL + NdotV - NdotL * NdotV));
 }

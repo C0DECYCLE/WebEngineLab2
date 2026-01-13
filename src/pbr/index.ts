@@ -17,15 +17,19 @@ import { includeExternal, loadOBJ, loadTexture, OBJ } from "./helper.js";
 //////////// CONSTS ////////////
 
 const byteSize: int = 4;
-const directory: string = "./resources/lantern/";
-export const imageFormat: GPUTextureFormat = "rgba8unorm";
+const mesh: string = "lantern";
+const directory: string = "./resources/" + mesh + "/";
 const depthFormat: GPUTextureFormat = "depth32float";
-(window as any).PBR = true;
+const linearFormat: GPUTextureFormat = "rgba8unorm";
+const srgbFormat: GPUTextureFormat = "rgba8unorm-srgb";
+(window as any).PBR = false;
 
 //////////// SETUP ////////////
 
-const presentationFormat: GPUTextureFormat =
+const swapchainFormat: GPUTextureFormat =
     navigator.gpu.getPreferredCanvasFormat();
+const swapchainViewFormat: GPUTextureFormat = (swapchainFormat +
+    "-srgb") as GPUTextureFormat;
 const canvas: HTMLCanvasElement = document.createElement("canvas");
 canvas.width = document.body.clientWidth * devicePixelRatio;
 canvas.height = document.body.clientHeight * devicePixelRatio;
@@ -37,7 +41,7 @@ canvas.style.height = "100%";
 document.body.appendChild(canvas);
 const adapter: Nullable<GPUAdapter> = await navigator.gpu?.requestAdapter();
 const device: Undefinable<GPUDevice> = await adapter?.requestDevice({
-    requiredFeatures: ["timestamp-query"],
+    requiredFeatures: ["subgroups", "timestamp-query"],
 });
 const context: Nullable<GPUCanvasContext> = canvas.getContext("webgpu");
 if (!device || !context) {
@@ -45,7 +49,8 @@ if (!device || !context) {
 }
 context.configure({
     device: device,
-    format: presentationFormat,
+    format: swapchainFormat,
+    viewFormats: [swapchainViewFormat],
 });
 
 //////////// CAMERA CONTROL ////////////
@@ -90,7 +95,7 @@ stats.show();
 //////////// GEOMETRY ////////////
 
 const gPre: float = performance.now();
-const geometry: OBJ = await loadOBJ(directory + "lantern_full.obj");
+const geometry: OBJ = await loadOBJ(directory + mesh + ".obj");
 const vertexBuffer: GPUBuffer = device.createBuffer({
     size: geometry.vertices.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -106,53 +111,85 @@ log("geometry", dotit(performance.now() - gPre), "ms");
 
 //////////// TEXTURE ////////////
 
+/*
+- baseColor / albedo 
+- normal 
+- specular 
+- roughness 
+- metalness
+- Ambient occlusion 
+- cavity 
+- fuzz 
+*/
+
 const tPre: float = performance.now();
 const downsampler: WebGPUSinglePassDownsampler =
-    new WebGPUSinglePassDownsampler({ device: device });
+    new WebGPUSinglePassDownsampler({
+        device: device,
+        formats: [{ format: linearFormat }],
+    });
 const textureSampler: GPUSampler = device.createSampler({
     minFilter: "linear",
     magFilter: "linear",
-    mipmapFilter: "nearest",
+    mipmapFilter: "nearest", // "linear"
 });
-const baseColorTexture: GPUTexture = await loadTexture(
+const baseColorTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_baseColor.jpg",
+    directory + mesh + "_baseColor.jpg",
+    linearFormat,
+    srgbFormat,
 );
-const normalTexture: GPUTexture = await loadTexture(
+const normalTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_normal.jpg",
+    directory + mesh + "_normal.jpg",
+    linearFormat,
+    linearFormat,
 );
-const specularTexture: GPUTexture = await loadTexture(
+const specularTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_specular.jpg",
+    directory + mesh + "_specular.jpg",
+    linearFormat,
+    linearFormat, //srgbFormat,
 );
-const glossTexture: GPUTexture = await loadTexture(
+const roughnessTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_gloss.jpg",
+    directory + mesh + "_roughness.jpg",
+    linearFormat,
+    linearFormat,
 );
-const ambientOcclusionTexture: GPUTexture = await loadTexture(
+/*
+const metalnessTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_ambientOcclusion.jpg",
+    directory + mesh + "_metalness.jpg",
+    linearFormat,
+    linearFormat,
 );
-const cavityTexture: GPUTexture = await loadTexture(
+*/
+const ambientOcclusionTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_cavity.jpg",
+    directory + mesh + "_ambientOcclusion.jpg",
+    linearFormat,
+    linearFormat,
 );
-const roughnessTexture: GPUTexture = await loadTexture(
+const cavityTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_roughness.jpg",
+    directory + mesh + "_cavity.jpg",
+    linearFormat,
+    linearFormat, //srgbFormat,
 );
-const fuzzTexture: GPUTexture = await loadTexture(
+const fuzzTexture: GPUTextureView = await loadTexture(
     device,
     downsampler,
-    directory + "lantern_fuzz.jpg",
+    directory + mesh + "_fuzz.jpg",
+    linearFormat,
+    linearFormat, //srgbFormat,
 );
 log("textures", dotit(performance.now() - tPre), "ms");
 
@@ -196,7 +233,7 @@ const nonPBRPipeline: GPURenderPipeline = device.createRenderPipeline({
     fragment: {
         module: nonPBRShader,
         entryPoint: "fs",
-        targets: [{ format: presentationFormat }],
+        targets: [{ format: swapchainViewFormat }],
     },
     primitive: {
         cullMode: "back",
@@ -216,7 +253,7 @@ const PBRPipeline: GPURenderPipeline = device.createRenderPipeline({
     fragment: {
         module: PBRShader,
         entryPoint: "fs",
-        targets: [{ format: presentationFormat }],
+        targets: [{ format: swapchainViewFormat }],
     },
     primitive: {
         cullMode: "back",
@@ -245,10 +282,11 @@ const nonPBRBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 0, resource: cameraBuffer },
         { binding: 1, resource: vertexBuffer },
         { binding: 2, resource: textureSampler },
+
         { binding: 3, resource: baseColorTexture },
         { binding: 4, resource: normalTexture },
         { binding: 5, resource: specularTexture },
-        { binding: 6, resource: glossTexture },
+        { binding: 6, resource: roughnessTexture },
         { binding: 7, resource: ambientOcclusionTexture },
         { binding: 8, resource: cavityTexture },
     ],
@@ -259,6 +297,7 @@ const PBRBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 0, resource: cameraBuffer },
         { binding: 1, resource: vertexBuffer },
         { binding: 2, resource: textureSampler },
+
         { binding: 3, resource: baseColorTexture },
         { binding: 4, resource: normalTexture },
         { binding: 5, resource: roughnessTexture },
@@ -277,13 +316,16 @@ function frame(now: float): void {
 
     control.update();
     cameraPos.store(cameraData, 0);
+    cameraData[3] = now;
     cameraView.view(cameraPos, cameraDir, up);
     viewProjection.multiply(cameraView, projection).store(cameraData, 4);
     device.queue.writeBuffer(cameraBuffer, 0, cameraData.buffer);
 
     //////////// ENCODE ////////////
 
-    const target: GPUTextureView = context.getCurrentTexture().createView();
+    const target: GPUTextureView = context.getCurrentTexture().createView({
+        format: swapchainViewFormat,
+    });
 
     const encoder: GPUCommandEncoder = device.createCommandEncoder();
 

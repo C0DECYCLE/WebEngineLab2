@@ -5,6 +5,7 @@
 
 struct Camera {
     position: vec3f,
+    now: f32,
     viewProjection: mat4x4f,
 }
 
