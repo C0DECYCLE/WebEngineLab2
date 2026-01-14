@@ -12,6 +12,7 @@ import { assert, fileExists } from "../utilities/utils.js";
 import { float, int, Nullable } from "../utilities/utils.type.js";
 import { Vec2 } from "../utilities/Vec2.js";
 import { Vec3 } from "../utilities/Vec3.js";
+import { imageSize } from "./index.js";
 
 //////////// SHADER ////////////
 
@@ -98,7 +99,7 @@ export async function loadOBJ(file: string): Promise<OBJ> {
 
 let dummyTextureView: Nullable<GPUTextureView> = null;
 
-export async function loadTexture(
+export async function createTexture(
     device: GPUDevice,
     downsampler: WebGPUSinglePassDownsampler,
     file: string,
@@ -116,21 +117,35 @@ export async function loadTexture(
         }
         return dummyTextureView;
     }
-    const blob: Blob = await (await fetch(file)).blob();
-    const imageBitmap: ImageBitmap = await createImageBitmap(blob, {
-        colorSpaceConversion: "none",
-    });
     const texture: GPUTexture = device.createTexture({
         format: format,
         viewFormats: [format, viewFormat],
-        size: [imageBitmap.width, imageBitmap.height],
-        mipLevelCount: maxMipLevelCount(imageBitmap.width, imageBitmap.height),
+        size: [imageSize, imageSize],
+        mipLevelCount: maxMipLevelCount(imageSize, imageSize),
         usage:
             GPUTextureUsage.TEXTURE_BINDING |
             GPUTextureUsage.COPY_DST |
             GPUTextureUsage.RENDER_ATTACHMENT |
             GPUTextureUsage.STORAGE_BINDING,
     });
+    fillTexture(device, downsampler, file, texture);
+    return texture.createView({
+        format: viewFormat,
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
+}
+
+async function fillTexture(
+    device: GPUDevice,
+    downsampler: WebGPUSinglePassDownsampler,
+    file: string,
+    texture: GPUTexture,
+): Promise<void> {
+    const blob: Blob = await (await fetch(file)).blob();
+    const imageBitmap: ImageBitmap = await createImageBitmap(blob, {
+        colorSpaceConversion: "none",
+    });
+    assert(imageBitmap.width === imageSize && imageBitmap.height === imageSize);
     device.queue.copyExternalImageToTexture(
         { source: imageBitmap, flipY: true },
         { texture: texture, mipLevel: 0 },
@@ -138,9 +153,5 @@ export async function loadTexture(
     );
     downsampler.generateMipmaps(device, texture, {
         filter: SPDFilters.Average,
-    });
-    return texture.createView({
-        format: viewFormat,
-        usage: GPUTextureUsage.TEXTURE_BINDING,
     });
 }

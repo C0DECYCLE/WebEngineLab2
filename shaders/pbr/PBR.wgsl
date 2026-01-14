@@ -10,13 +10,10 @@
 @group(0) @binding(0) var<storage, read> camera: Camera;
 @group(0) @binding(1) var<storage, read> vertices: array<VertexPack>;
 @group(0) @binding(2) var textureSampler: sampler;
-@group(0) @binding(3) var albedoTexture: texture_2d<f32>;
+@group(0) @binding(3) var baseColorTexture: texture_2d<f32>;
 @group(0) @binding(4) var normalTexture: texture_2d<f32>;
 @group(0) @binding(5) var roughnessTexture: texture_2d<f32>;
 @group(0) @binding(6) var metalnessTexture: texture_2d<f32>;
-@group(0) @binding(7) var ambientOcclusionTexture: texture_2d<f32>;
-@group(0) @binding(8) var cavityTexture: texture_2d<f32>;
-@group(0) @binding(9) var fuzzTexture: texture_2d<f32>;
 
 @vertex fn vs(
     @builtin(vertex_index) vertexIndex: u32
@@ -32,15 +29,31 @@
 @fragment fn fs(
     rasterize: Rasterize
 ) -> @location(0) vec4f {
+    let albedo: vec3f = textureSample(baseColorTexture, textureSampler, rasterize.uv).rgb;
+    let normalMap: vec3f = textureSample(normalTexture, textureSampler, rasterize.uv).rgb;
+    let roughness: f32 = textureSample(roughnessTexture, textureSampler, rasterize.uv).r;
+    let metalness: f32 = textureSample(metalnessTexture, textureSampler, rasterize.uv).r;
 
-    let albedoSample: vec3f = textureSample(albedoTexture, textureSampler, rasterize.uv).rgb;
-    let normalSample: vec3f = textureSample(normalTexture, textureSampler, rasterize.uv).rgb;
-    let roughnessSample: f32 = textureSample(roughnessTexture, textureSampler, rasterize.uv).r;
-    let metalnessSample: f32 = textureSample(metalnessTexture, textureSampler, rasterize.uv).r;
-    let ambientOcclusionSample: f32 = textureSample(ambientOcclusionTexture, textureSampler, rasterize.uv).r;
-    let cavitySample: f32 = textureSample(cavityTexture, textureSampler, rasterize.uv).r;
-    let fuzzSample: f32 = textureSample(fuzzTexture, textureSampler, rasterize.uv).r;
-    
-    return vec4(albedoSample, 1);
-    //return vec4(rasterize.normal * 0.5 + 0.5, 1);
+    let TBN: mat3x3f = deriveTBN(rasterize.position, normalize(rasterize.normal), rasterize.uv);
+    let N: vec3f = normalize(TBN * normalize(normalMap * 2 - 1));
+    let V: vec3f = normalize(camera.position - rasterize.position);
+    let L: vec3f = normalize(-vec3f(-1, -1, -1));
+    let H: vec3f = normalize(V + L);
+    let radiance: vec3f = vec3f(5);
+
+    let F0: vec3f = mix(vec3f(0.04), albedo, metalness);
+    let NDF: f32 = distributionGGX(N, H, roughness);
+    let G: f32 = geometrySmith(N, V, L, roughness);
+    let F: vec3f = fresnelSchlick(saturate(dot(H, V)), F0);
+
+    let numerator: vec3f = NDF * G * F;
+    let denominator: f32 = 4 * saturate(dot(N, V)) * saturate(dot(N, L)) + 0.0001;
+    let specular: vec3f = numerator / denominator;
+
+    let kS: vec3f = F;
+    let kD: vec3f = (vec3f(1) - kS) * (1 - metalness);
+    let NdotL: f32 = saturate(dot(N, L));
+    let color: vec3f = (kD * albedo / PI + specular) * radiance * NdotL;
+
+    return vec4f(tonemapReinhard(color), 1);
 }

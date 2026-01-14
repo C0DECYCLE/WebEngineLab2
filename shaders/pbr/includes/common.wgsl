@@ -23,6 +23,33 @@ fn deriveTBN(position: vec3f, normal: vec3f, uv: vec2f) -> mat3x3f {
     return mat3x3f(tangent * invmax, bitangent * invmax, normal);
 }
 
+fn fresnelSchlick(cosTheta: f32, F0: vec3f) -> vec3f {
+    return F0 + (1 - F0) * pow(1 - cosTheta, 5);
+}
+
+fn distributionGGX(N: vec3f, H: vec3f, roughness: f32) -> f32 {
+    let a: f32  = roughness * roughness;
+    let a2: f32 = a * a;
+    let NdotH: f32 = saturate(dot(N, H));
+    let NdotH2: f32 = NdotH * NdotH;
+    let denom: f32 = (NdotH2 * (a2 - 1) + 1);
+    return a2 / (PI * denom * denom);
+}
+
+fn geometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
+    let r: f32 = roughness + 1;
+    let k: f32 = (r * r) / 8;
+    return NdotV / (NdotV * (1 - k) + k);
+}
+
+fn geometrySmith(N: vec3f, V: vec3f, L: vec3f, roughness: f32) -> f32 {
+    let NdotV: f32 = saturate(dot(N, V));
+    let NdotL: f32 = saturate(dot(N, L));
+    let ggxV: f32 = geometrySchlickGGX(NdotV, roughness);
+    let ggxL: f32 = geometrySchlickGGX(NdotL, roughness);
+    return ggxV * ggxL;
+}
+
 fn tonemapReinhard(color: vec3f) -> vec3f {
     return color / (color + vec3f(1));
 }

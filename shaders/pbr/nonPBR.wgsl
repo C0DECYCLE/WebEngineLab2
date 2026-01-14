@@ -46,6 +46,8 @@
     let viewDir: vec3f = normalize(camera.position - rasterize.position);
     let halfDir: vec3f = normalize(lightDir + viewDir);
 
+    let ambient: vec3f = albedo * 0.25 * ao * cavity;
+
     let halfLambert: f32 = dot(normal, lightDir) * 0.5 + 0.5;
     let diffuse: vec3f = albedo * halfLambert;
 
@@ -54,5 +56,5 @@
     let reflectivity: f32 = max(dot(normal, halfDir), 0);
     let specular: f32 = pow(reflectivity, shininess) * specularStrength;
 
-    return vec4f((diffuse + specular) * lightColor * ao * cavity, 1);
+    return vec4f(ambient + (diffuse + specular) * lightColor, 1);
 }

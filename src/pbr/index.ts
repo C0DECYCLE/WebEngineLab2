@@ -12,11 +12,12 @@ import { Mat4 } from "../utilities/Mat4.js";
 import { assert, dotit, toRadian } from "../utilities/utils.js";
 import { float, int, Nullable, Undefinable } from "../utilities/utils.type.js";
 import { Vec3 } from "../utilities/Vec3.js";
-import { includeExternal, loadOBJ, loadTexture, OBJ } from "./helper.js";
+import { includeExternal, loadOBJ, createTexture, OBJ } from "./helper.js";
 
 //////////// CONSTS ////////////
 
-const byteSize: int = 4;
+export const byteSize: int = 4;
+export const imageSize: int = 4096;
 /*
 - lantern
 - suitcase
@@ -26,12 +27,12 @@ const byteSize: int = 4;
 - bust
 - snow
 */
-const mesh: string = "lantern";
+const mesh: string = "snow";
 const directory: string = "./resources/" + mesh + "/";
 const depthFormat: GPUTextureFormat = "depth32float";
 const linearFormat: GPUTextureFormat = "rgba8unorm";
 const srgbFormat: GPUTextureFormat = "rgba8unorm-srgb";
-(window as any).PBR = false;
+(window as any).PBR = true;
 
 //////////// SETUP ////////////
 
@@ -144,56 +145,56 @@ const textureSampler: GPUSampler = device.createSampler({
     magFilter: "linear",
     mipmapFilter: "linear", // "nearest" for performance
 });
-const baseColorTexture: GPUTextureView = await loadTexture(
+const baseColorTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_baseColor.jpg",
     linearFormat,
     srgbFormat,
 );
-const normalTexture: GPUTextureView = await loadTexture(
+const normalTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_normal.jpg",
     linearFormat,
     linearFormat,
 );
-const specularTexture: GPUTextureView = await loadTexture(
+const specularTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_specular.jpg",
     linearFormat,
     srgbFormat, //srgbFormat,
 );
-const roughnessTexture: GPUTextureView = await loadTexture(
+const roughnessTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_roughness.jpg",
     linearFormat,
     linearFormat,
 );
-const metalnessTexture: GPUTextureView = await loadTexture(
+const metalnessTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_metalness.jpg",
     linearFormat,
     linearFormat,
 );
-const ambientOcclusionTexture: GPUTextureView = await loadTexture(
+const ambientOcclusionTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_ambientOcclusion.jpg",
     linearFormat,
     linearFormat,
 );
-const cavityTexture: GPUTextureView = await loadTexture(
+const cavityTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_cavity.jpg",
     linearFormat,
     srgbFormat, //srgbFormat,
 );
-const fuzzTexture: GPUTextureView = await loadTexture(
+const fuzzTexture: GPUTextureView = await createTexture(
     device,
     downsampler,
     directory + mesh + "_fuzz.jpg",
@@ -311,9 +312,6 @@ const PBRBindGroup: GPUBindGroup = device.createBindGroup({
         { binding: 4, resource: normalTexture },
         { binding: 5, resource: roughnessTexture },
         { binding: 6, resource: metalnessTexture },
-        { binding: 7, resource: ambientOcclusionTexture },
-        { binding: 8, resource: cavityTexture },
-        { binding: 9, resource: fuzzTexture },
     ],
 });
 
