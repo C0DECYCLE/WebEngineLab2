@@ -40,19 +40,21 @@
     let L: vec3f = normalize(-vec3f(-1, -1, -1));
     let H: vec3f = normalize(V + L);
     let radiance: vec3f = vec3f(5);
+    let HdotV: f32 = saturate(dot(H, V));
+    let NdotL: f32 = saturate(dot(N, L)/* * 0.5 + 0.5*/);
+    let NdotV: f32 = saturate(dot(N, V));
 
     let F0: vec3f = mix(vec3f(0.04), albedo, metalness);
     let NDF: f32 = distributionGGX(N, H, roughness);
     let G: f32 = geometrySmith(N, V, L, roughness);
-    let F: vec3f = fresnelSchlick(saturate(dot(H, V)), F0);
+    let F: vec3f = fresnelSchlick(HdotV, F0);
 
     let numerator: vec3f = NDF * G * F;
-    let denominator: f32 = 4 * saturate(dot(N, V)) * saturate(dot(N, L)) + 0.0001;
+    let denominator: f32 = 4 * NdotV * NdotL + 0.0001;
     let specular: vec3f = numerator / denominator;
 
     let kS: vec3f = F;
     let kD: vec3f = (vec3f(1) - kS) * (1 - metalness);
-    let NdotL: f32 = saturate(dot(N, L));
     let color: vec3f = (kD * albedo / PI + specular) * radiance * NdotL;
 
     return vec4f(tonemapReinhard(color), 1);

@@ -27,7 +27,7 @@ export const imageSize: int = 4096;
 - bust
 - snow
 */
-const mesh: string = "snow";
+const mesh: string = "lantern";
 const directory: string = "./resources/" + mesh + "/";
 const depthFormat: GPUTextureFormat = "depth32float";
 const linearFormat: GPUTextureFormat = "rgba8unorm";
