@@ -3,7 +3,8 @@
  * Written by Noah Mattia Bussinger
  */
 
-import { METIS_OPTION, partitionGraph } from "./METISb/partitionGraph.js";
+// @ts-ignore
+import { METIS_Option, METIS_PartGraphKway } from "./metis/dist/index.js";
 
 export type Mesh = {
     positions: Float32Array;
@@ -130,10 +131,10 @@ export async function clusterizeTriangles(
     const { xadj, adjncy, adjwgt, triangleAdjacency } =
         buildWeightedTriangleAdjacency(mesh);
 
-    const clusters = await partitionGraph(xadj, adjncy, adjwgt, nparts, {
+    const clusters = await METIS_PartGraphKway(xadj, adjncy, adjwgt, nparts, {
         //[METIS_OPTION.NUMBERING]: 0,
         //[METIS_OPTION.CONTIG]: 1,
-        [METIS_OPTION.UFACTOR]: 1,
+        [METIS_Option.UFACTOR]: 1,
     });
 
     const meshlets = buildMeshletsFromClusters(mesh, clusters);

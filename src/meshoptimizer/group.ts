@@ -4,7 +4,8 @@
  */
 
 import { Mesh } from "./clusterize.js";
-import { METIS_OPTION, partitionGraph } from "./METISb/partitionGraph.js";
+// @ts-ignore
+import { METIS_Option, METIS_PartGraphKway } from "./metis/dist/index.js";
 
 function buildTriangleToClusterMap(clusters: number[][]): Int32Array {
     let maxTri = 0;
@@ -160,10 +161,10 @@ export async function groupClusters(
         topoEdges,
     );
 
-    const groups = await partitionGraph(xadj, adjncy, adjwgt, nparts, {
+    const groups = await METIS_PartGraphKway(xadj, adjncy, adjwgt, nparts, {
         //[METIS_OPTION.NUMBERING]: 0,
         //[METIS_OPTION.CONTIG]: 1,
-        [METIS_OPTION.UFACTOR]: 1,
+        [METIS_Option.UFACTOR]: 1,
     });
 
     return groups;
